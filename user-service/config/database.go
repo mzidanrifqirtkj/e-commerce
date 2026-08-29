@@ -3,8 +3,8 @@ package config
 import (
 	"fmt"
 	"log"
+	"user-service/database/seeds"
 
-	"golang.org/x/tools/go/cfg"
 	"gorm.io/gorm"
 )
 
@@ -12,7 +12,7 @@ type Postgres struct {
 	DB *gorm.DB
 }
 
-func (cfh Config) ConnectionPostgres() (*Postgres, error) {
+func (cfg Config) ConnectionPostgres() (*Postgres, error) {
 	dbConnString := fmt.Sprintf("postgres://%s:%s@%s:%s/%s",
 		cfg.Psql.User,
 		cfg.Psql.Password,
@@ -32,10 +32,11 @@ func (cfh Config) ConnectionPostgres() (*Postgres, error) {
 		return nil, err
 	}
 
-	seeds.SeedAdmin(db)
+	sqlDB.SetMaxOpenConns(cfg.Psql.DBMaxOpen)
+	sqlDB.SetMaxIdleConns(cfg.Psql.DBMaxIdle)
 
-	sqlDB.setMaxOpenConns(cfg.Psql.DBMaxOpen)
-	sqlDB.setMaxIdleConns(cfg.Psql.DBMaxIdle)
+	seeds.SeedRole(db)
+	seeds.SeedAdmin(db)
 
 	return &Postgres{DB: db}, nil
 }

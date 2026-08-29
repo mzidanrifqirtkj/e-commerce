@@ -12,7 +12,7 @@ type User struct {
 	Photo      string
 	Lat        string
 	Lng        string
-	isVerified bool
+	IsVerified bool
 	CreatedAt  time.Time
 	UpdatedAt  time.Time
 	DeletedAt  *time.Time

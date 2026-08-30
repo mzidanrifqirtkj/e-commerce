@@ -20,6 +20,7 @@ type userService struct {
 func (u *userService) SignIn(ctx context.Context, req entity.UserEntity) (*entity.UserEntity, string, error) {
 	user, err := u.repo.GetUserByEmail(ctx, req.Email)
 	if err != nil {
+		log.Errorf("[UserService-1] SignIn: %v", err)
 		return nil, "", err
 	}
 

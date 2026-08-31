@@ -20,13 +20,13 @@ type userService struct {
 func (u *userService) SignIn(ctx context.Context, req entity.UserEntity) (*entity.UserEntity, string, error) {
 	user, err := u.repo.GetUserByEmail(ctx, req.Email)
 	if err != nil {
-		log.Errorf("[UserService-1] SignIn: %v", err)
+		log.Println("[UserService-1] SignIn: %v", err)
 		return nil, "", err
 	}
 
 	if checkPass := conv.CheckPasswordHash(req.Password, user.Password); !checkPass {
 		err = errors.New("Password is Incorrect")
-		log.Errorf("[UserService-1] SignIn: %v", err)
+		log.Fatal("[UserService-1] SignIn: %v", err)
 		return nil, "", err
 	}
 

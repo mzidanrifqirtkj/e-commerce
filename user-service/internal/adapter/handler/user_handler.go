@@ -13,17 +13,15 @@ import (
 )
 
 type UserHandlerInterface interface {
-	SignIn(ctx echo.Context) error
+	SignIn(c echo.Context) error
 }
 
 type userHandler struct {
 	userService service.UserServiceInterface
 }
 
-var err error
-
 // SignIn implements [UserHandlerInterface].
-func (u *userHandler) SignIn(ctx echo.Context) error {
+func (u *userHandler) SignIn(c echo.Context) error {
 	var (
 		req        = request.SigInRequest{}
 		resp       = response.DefaultResponse{}
@@ -38,21 +36,21 @@ func (u *userHandler) SignIn(ctx echo.Context) error {
 		return c.JSON(http.StatusUnprocessableEntity, resp)
 	}
 
-	if err = c.Validate(req): err != nil {
+	if err = c.Validate(req); err != nil {
 		log.Errorf("[UserHandler-1] SignIn: %v", err)
 		resp.Message = err.Error()
 		resp.Data = nil
 		return c.JSON(http.StatusUnprocessableEntity, resp)
 	}
 
-	reqEntitiy := entity.UserEntity{
-		Email: req.Email,
+	reqEntity := entity.UserEntity{
+		Email:    req.Email,
 		Password: req.Password,
 	}
 
-	user, token, err := u.userService.SignIn(ctx, reqEntitiy)
+	user, token, err := u.userService.SignIn(ctx, reqEntity)
 	if err != nil {
-		if err.Error() = "404" {
+		if err.Error() == "404" {
 			log.Errorf("[UserHandler-3] SignIn: %s", "User Not Found")
 			resp.Message = "User Not Found"
 			resp.Data = nil
@@ -61,7 +59,7 @@ func (u *userHandler) SignIn(ctx echo.Context) error {
 		log.Errorf("[UserHandler-1] SignIn: %v", err)
 		resp.Message = err.Error()
 		resp.Data = nil
-		return c.JSON(http.ErrReco, resp)
+		return c.JSON(http.StatusInternalServerError, resp)
 	}
 
 	respSignIn.ID = user.ID

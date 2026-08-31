@@ -2,9 +2,11 @@ package config
 
 import (
 	"fmt"
-	"log"
 	"user-service/database/seeds"
 
+	"github.com/pressly/goose/v3"
+	"github.com/rs/zerolog/log"
+	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
@@ -20,7 +22,7 @@ func (cfg Config) ConnectionPostgres() (*Postgres, error) {
 		cfg.Psql.Port,
 		cfg.Psql.DBName)
 
-	db, err := gorm.Open(Postgres.Open(dbConnString), &gorm.Config{})
+	db, err := gorm.Open(postgres.Open(dbConnString), &gorm.Config{})
 	if err != nil {
 		log.Error().Err(err).Msg("[ConnectionPostgres-1] Failed to connect to Database" + cfg.Psql.Host)
 		return nil, err
@@ -34,6 +36,11 @@ func (cfg Config) ConnectionPostgres() (*Postgres, error) {
 
 	sqlDB.SetMaxOpenConns(cfg.Psql.DBMaxOpen)
 	sqlDB.SetMaxIdleConns(cfg.Psql.DBMaxIdle)
+
+	if err := goose.Up(sqlDB, "migrations"); err != nil {
+		log.Error().Err(err).Msg("[ConnectionPostgres-3] Failed to run migrations")
+		return nil, err
+	}
 
 	seeds.SeedRole(db)
 	seeds.SeedAdmin(db)

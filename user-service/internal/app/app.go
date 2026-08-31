@@ -11,12 +11,11 @@ import (
 	"user-service/internal/adapter/handler"
 	"user-service/internal/adapter/repository"
 	"user-service/internal/core/service"
+	validators "user-service/utils/validator"
 
-	"github.com/go-playground/validator/v10/non-standard/validators"
 	"github.com/go-playground/validator/v10/translations/en"
 	"github.com/labstack/echo"
 	"github.com/labstack/echo/middleware"
-	"github.com/labstack/echo/v5/middleware"
 )
 
 func RunServer() {

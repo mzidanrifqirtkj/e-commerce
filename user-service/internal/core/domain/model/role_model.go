@@ -10,3 +10,7 @@ type Role struct {
 	UpdatedAt time.Time
 	DeletedAt *time.Time
 }
+
+func (Role) TableName() string {
+	return "roles"
+}

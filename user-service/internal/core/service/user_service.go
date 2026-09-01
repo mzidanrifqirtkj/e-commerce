@@ -3,7 +3,9 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
+	"user-service/config"
 	"user-service/internal/adapter/repository"
 	"user-service/internal/core/domain/entity"
 	"user-service/utils/conv"
@@ -14,7 +16,9 @@ type UserServiceInterface interface {
 }
 
 type userService struct {
-	repo repository.UserRepositoryInterface
+	repo       repository.UserRepositoryInterface
+	cfg        *config.Config
+	jwtService JWTServiceInterface
 }
 
 func (u *userService) SignIn(ctx context.Context, req entity.UserEntity) (*entity.UserEntity, string, error) {
@@ -30,9 +34,15 @@ func (u *userService) SignIn(ctx context.Context, req entity.UserEntity) (*entit
 		return nil, "", err
 	}
 
-	return user, "", err
+	token, err := u.jwtService.GenerateToken(fmt.Sprintf("%d", user.ID))
+	if err != nil {
+		log.Fatal("[UserService-1] SignIn: %v", err)
+		return nil, "", err
+	}
+
+	return user, token, err
 }
 
-func NewUserService(repo repository.UserRepositoryInterface) UserServiceInterface {
-	return &userService{repo: repo}
+func NewUserService(repo repository.UserRepositoryInterface, cfg *config.Config, jwtService JWTServiceInterface) UserServiceInterface {
+	return &userService{repo: repo, cfg: cfg, jwtService: jwtService}
 }

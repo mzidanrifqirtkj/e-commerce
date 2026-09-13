@@ -2,13 +2,15 @@ package handler
 
 import (
 	"net/http"
+	"user-service/config"
+	"user-service/internal/adapter"
 	"user-service/internal/adapter/handler/request"
 	"user-service/internal/adapter/handler/response"
 	"user-service/internal/core/domain/entity"
 	"user-service/internal/core/service"
 
-	"github.com/labstack/echo"
-	"github.com/labstack/echo/middleware"
+	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
 	"github.com/labstack/gommon/log"
 )
 
@@ -79,11 +81,18 @@ func (u *userHandler) SignIn(c echo.Context) error {
 
 var err error
 
-func NewUserHandler(e *echo.Echo, userService service.UserServiceInterface) UserHandlerInterface {
+func NewUserHandler(e *echo.Echo, userService service.UserServiceInterface, cfg *config.Config) UserHandlerInterface {
 	userHandler := &userHandler{userService: userService}
 
 	e.Use(middleware.Recover())
 	e.POST("signin", userHandler.SignIn)
+
+	mid := adapter.NewMiddlewareAdapter(cfg)
+	adminGroup := e.Group("/admin")
+	adminGroup.Use(mid.CheckToken())
+	adminGroup.GET("/check", func(c echo.Context) error {
+		return c.String(200, "Admin route accessed successfully")
+	})
 
 	return userHandler
 }

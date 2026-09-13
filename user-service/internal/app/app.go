@@ -14,8 +14,8 @@ import (
 	validators "user-service/utils/validator"
 
 	"github.com/go-playground/validator/v10/translations/en"
-	"github.com/labstack/echo"
-	"github.com/labstack/echo/middleware"
+	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
 )
 
 func RunServer() {
@@ -38,7 +38,7 @@ func RunServer() {
 	en.RegisterDefaultTranslations(customValidator.Validator, customValidator.Translator)
 	e.Validator = customValidator
 
-	handler.NewUserHandler(e, userService)
+	handler.NewUserHandler(e, userService, cfg)
 
 	go func() {
 		if cfg.App.AppPort == "" {

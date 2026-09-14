@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log"
+	"time"
 	"user-service/internal/core/domain/entity"
 	"user-service/internal/core/domain/model"
 
@@ -12,10 +13,39 @@ import (
 
 type UserRepositoryInterface interface {
 	GetUserByEmail(ctx context.Context, email string) (*entity.UserEntity, error)
+	CreateUserAccount(ctx context.Context, req entity.UserEntity) error
 }
 
 type userRepository struct {
 	db *gorm.DB
+}
+
+// CreateUserAccount implements [UserRepositoryInterface].
+func (u *userRepository) CreateUserAccount(ctx context.Context, req entity.UserEntity) error {
+	modelUser := model.User{
+		Name:     req.Name,
+		Email:    req.Email,
+		Password: req.Password,
+	}
+
+	if err := u.db.Create(&modelUser).Error; err != nil {
+		log.Printf("[UserRepository-1] CreateUserAccount: %v", err)
+		return err
+	}
+
+	currentTime := time.Now()
+	modelVerify := model.VerificationToken{
+		UserID:    modelUser.ID,
+		Token:     req.Token,
+		TokenType: "email_verification",
+		ExpiresAt: currentTime.Add(time.Hour * 1),
+	}
+
+	if err := u.db.Create(&modelVerify).Error; err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (u *userRepository) GetUserByEmail(ctx context.Context, email string) (*entity.UserEntity, error) {

@@ -12,4 +12,5 @@ type UserEntity struct {
 	Lng        string
 	IsVerified bool
 	RoleName   string
+	Token      string
 }

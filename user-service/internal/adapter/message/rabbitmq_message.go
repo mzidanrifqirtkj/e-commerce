@@ -1,9 +1,11 @@
 package message
 
 import (
+	"encoding/json"
 	"user-service/config"
 
 	"github.com/labstack/gommon/log"
+	"github.com/streadway/amqp"
 )
 
 type RabbitMQMessageInterface interface {
@@ -40,5 +42,26 @@ func PublishMessage(email, message, notif_type string) error {
 		return err
 	}
 
-	return nil
+	notification := map[string]string{
+		"email":   email,
+		"message": message,
+	}
+
+	body, err := json.Marshal(notification)
+	if err != nil {
+		log.Errorf("[PublishMessage-4] Failed to marshal notification: %v", err)
+		return err
+	}
+
+	return ch.Publish(
+		"",
+		queue.Name,
+		false,
+		false,
+		amqp.Publishing{
+			ContentType:  "application/json",
+			DeliveryMode: amqp.Persistent,
+			Body:         body,
+		},
+	)
 }

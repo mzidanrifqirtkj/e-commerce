@@ -7,10 +7,12 @@ import (
 	"log"
 	"time"
 	"user-service/config"
+	"user-service/internal/adapter/message"
 	"user-service/internal/adapter/repository"
 	"user-service/internal/core/domain/entity"
 	"user-service/utils/conv"
-	"uuid"
+
+	"github.com/google/uuid"
 )
 
 type UserServiceInterface interface {
@@ -29,7 +31,7 @@ func (u *userService) CreateUserAccount(ctx context.Context, req entity.UserEnti
 	password, err := conv.HashPassword(req.Password)
 
 	if err != nil {
-		log.Println("[UserService-CreateUserAccount] CreateUserAccount: %v", err)
+		log.Printf("[UserService-1] CreateUserAccount: %v", err)
 		return err
 	}
 
@@ -39,7 +41,15 @@ func (u *userService) CreateUserAccount(ctx context.Context, req entity.UserEnti
 
 	err = u.repo.CreateUserAccount(ctx, req)
 	if err != nil {
-		log.Println("[UserService-2] CreateUserAccount: %v", err)
+		log.Printf("[UserService-2] CreateUserAccount: %v", err)
+		return err
+	}
+
+	urlVerify := fmt.Sprintf("http://localhost:8080/verify?token=%v", req.Token)
+	messageParam := fmt.Sprintf("Please verify your account with click link below: %v", urlVerify)
+	err = message.PublishMessage(req.Email, messageParam, "email_verification")
+	if err != nil {
+		log.Printf("[UserService-3] CreateUserAccount: %v", err)
 		return err
 	}
 

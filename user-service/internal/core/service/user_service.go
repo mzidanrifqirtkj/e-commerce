@@ -10,6 +10,7 @@ import (
 	"user-service/internal/adapter/repository"
 	"user-service/internal/core/domain/entity"
 	"user-service/utils/conv"
+	"uuid"
 )
 
 type UserServiceInterface interface {
@@ -21,6 +22,28 @@ type userService struct {
 	repo       repository.UserRepositoryInterface
 	cfg        *config.Config
 	jwtService JWTServiceInterface
+}
+
+// CreateUserAccount implements [UserServiceInterface].
+func (u *userService) CreateUserAccount(ctx context.Context, req entity.UserEntity) error {
+	password, err := conv.HashPassword(req.Password)
+
+	if err != nil {
+		log.Println("[UserService-CreateUserAccount] CreateUserAccount: %v", err)
+		return err
+	}
+
+	req.Password = password
+	token := uuid.New().String()
+	req.Token = token
+
+	err = u.repo.CreateUserAccount(ctx, req)
+	if err != nil {
+		log.Println("[UserService-2] CreateUserAccount: %v", err)
+		return err
+	}
+
+	return nil
 }
 
 func (u *userService) SignIn(ctx context.Context, req entity.UserEntity) (*entity.UserEntity, string, error) {

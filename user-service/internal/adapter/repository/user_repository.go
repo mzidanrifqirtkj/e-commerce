@@ -68,7 +68,7 @@ func (u *userRepository) GetUserByEmail(ctx context.Context, email string) (*ent
 			log.Println("[UserRepository-1] GetUserByEmail: User Not Found")
 			return nil, err
 		}
-		log.Fatal("[UserRepository-1] GetUserByEmail: %v", err)
+		log.Printf("[UserRepository-1] GetUserByEmail: %v", err)
 		return nil, err
 	}
 

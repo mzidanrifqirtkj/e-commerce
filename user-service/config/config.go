@@ -28,10 +28,19 @@ type RabbitMQ struct {
 	User     string `json:"user"`
 	Password string `json:"password"`
 }
+
+type SMTP struct {
+	Host     string `json:"host"`
+	Port     string `json:"port"`
+	User     string `json:"user"`
+	Password string `json:"password"`
+	From     string `json:"from"`
+}
 type Config struct {
 	App      App      `json:"app"`
 	Psql     PsqlDB   `json:"psql"`
 	RabbitMQ RabbitMQ `json:"rabbitmq"`
+	SMTP     SMTP     `json:"smtp"`
 }
 
 func NewConfig() *Config {
@@ -59,6 +68,13 @@ func NewConfig() *Config {
 			Port:     viper.GetString("RABBITMQ_PORT"),
 			User:     viper.GetString("RABBITMQ_USER"),
 			Password: viper.GetString("RABBITMQ_PASSWORD"),
+		},
+		SMTP: SMTP{
+			Host:     viper.GetString("SMTP_HOST"),
+			Port:     viper.GetString("SMTP_PORT"),
+			User:     viper.GetString("SMTP_USER"),
+			Password: viper.GetString("SMTP_PASSWORD"),
+			From:     viper.GetString("SMTP_FROM"),
 		},
 	}
 }

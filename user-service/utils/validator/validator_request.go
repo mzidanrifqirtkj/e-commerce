@@ -36,7 +36,7 @@ func (v *Validator) Validate(i interface{}) error {
 	if err != nil {
 		object, _ := err.(validator.ValidationErrors)
 		for _, e := range object {
-			log.Infof("[Validate-1] %s: $s", e.Field(), e.Translate(v.Translator))
+			log.Infof("[Validate-1] %s: %s", e.Field(), e.Translate(v.Translator))
 
 			return errors.New(e.Translate(v.Translator))
 		}

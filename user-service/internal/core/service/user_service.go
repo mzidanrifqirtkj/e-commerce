@@ -19,6 +19,7 @@ type UserServiceInterface interface {
 	SignIn(ctx context.Context, req entity.UserEntity) (*entity.UserEntity, string, error)
 	CreateUserAccount(ctx context.Context, req entity.UserEntity) error
 	ForgotPassword(ctx context.Context, req entity.UserEntity) error
+	VerifyToken(ctx context.Context, token string) (*entity.UserEntity, error)
 }
 
 type userService struct {
@@ -26,6 +27,46 @@ type userService struct {
 	cfg        *config.Config
 	jwtService JWTServiceInterface
 	repoToken  repository.VerificationTokenRepositoryInterface
+}
+
+// VerifyToken implements [UserServiceInterface].
+func (u *userService) VerifyToken(ctx context.Context, token string) (*entity.UserEntity, error) {
+	verifyToken, err := u.repoToken.GetDataByToken(ctx, token)
+	if err != nil {
+		log.Printf("[UserService-1] VerifyToken: %v", err)
+		return nil, err
+	}
+
+	user, err := u.repo.UpdateUserVerified(ctx, verifyToken.UserID)
+	if err != nil {
+		log.Printf("[UserService-2] VerifyToken: %v", err)
+		return nil, err
+	}
+
+	accessToken, err := u.jwtService.GenerateToken(fmt.Sprintf("%d", user.ID))
+	if err != nil {
+		log.Printf("[UserService-3] VerifyToken: %v", err)
+		return nil, err
+	}
+
+	sessionData := map[string]interface{}{
+		"user_id":    user.ID,
+		"name":       user.Name,
+		"email":      user.Email,
+		"logged_in":  true,
+		"created_at": time.Now().String(),
+		"token":      accessToken,
+	}
+
+	redisConn := config.NewRedisClient()
+	err = redisConn.HSet(ctx, accessToken, sessionData).Err()
+	if err != nil {
+		log.Printf("[UserService-4] VerifyToken: %v", err)
+		return nil, err
+	}
+
+	user.Token = accessToken
+	return user, nil
 }
 
 // ForgotPassword implements [UserServiceInterface].
@@ -78,7 +119,7 @@ func (u *userService) CreateUserAccount(ctx context.Context, req entity.UserEnti
 		return err
 	}
 
-	urlVerify := fmt.Sprintf("http://localhost:8080/verify?token=%v", req.Token)
+	urlVerify := fmt.Sprintf("%s/verify-account?token=%v", u.cfg.App.UrlForgotPassword, req.Token)
 	messageParam := fmt.Sprintf("Please verify your account with click link below: %v", urlVerify)
 	err = message.PublishMessage(req.Email, messageParam, "email_verification")
 	if err != nil {

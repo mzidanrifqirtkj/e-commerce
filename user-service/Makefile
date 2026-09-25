@@ -1,7 +1,7 @@
 APP_NAME := user-service
 MAIN := ./main.go
 
-.PHONY: all build run test lint migrate-up migrate-down clean
+.PHONY: all build run worker test lint migrate-up migrate-down clean
 
 all: build
 
@@ -10,6 +10,9 @@ build:
 
 run:
 	go run $(MAIN) start
+
+worker:
+	go run $(MAIN) worker
 
 test:
 	go test ./... -v

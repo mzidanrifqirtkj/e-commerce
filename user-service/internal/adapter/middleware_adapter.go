@@ -34,7 +34,7 @@ func (m *middlewareAdapter) CheckToken() echo.MiddlewareFunc {
 
 			tokenString := strings.TrimPrefix(authHeader, "Bearer ")
 
-			getSession, err := redisConn.HGetAll(e.Request().Context(), tokenString).Result()
+			getSession, err := redisConn.Get(e.Request().Context(), tokenString).Result()
 			if err != nil || len(getSession) == 0 {
 				log.Errorf("[MiddlewareAdapter-2] CheckToken: %s", "Invalid or expired token")
 				respErr.Message = err.Error()

@@ -303,7 +303,7 @@ func NewUserHandler(e *echo.Echo, userService service.UserServiceInterface, cfg 
 	e.POST("/signup", userHandler.CreateUserAccount)
 	e.POST("/forgot-password", userHandler.ForgotPassword)
 	e.GET("/verify-account", userHandler.VerifyAccount)
-	e.GET("/update-password", userHandler.UpdatePassword)
+	e.PUT("/update-password", userHandler.UpdatePassword)
 
 	mid := adapter.NewMiddlewareAdapter(cfg)
 	adminGroup := e.Group("/admin")

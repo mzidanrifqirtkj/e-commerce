@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log"
 	"time"
+	"user-service/internal/core/domain/apperror"
 	"user-service/internal/core/domain/entity"
 	"user-service/internal/core/domain/model"
 
@@ -14,6 +15,7 @@ import (
 type VerificationTokenRepositoryInterface interface {
 	CreateVerificationToken(ctx context.Context, req entity.VerificationTokenEntity) error
 	GetDataByToken(ctx context.Context, token string) (*entity.VerificationTokenEntity, error)
+	DeleteTokenByID(ctx context.Context, id int64) error
 }
 
 type VerificationTokenRepository struct {
@@ -25,7 +27,7 @@ func (v *VerificationTokenRepository) GetDataByToken(ctx context.Context, token 
 	modelToken := model.VerificationToken{}
 	if err := v.db.Where("token = ?", token).First(&modelToken).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			err = errors.New("404")
+			err = apperror.ErrNotFound
 			log.Printf("[VerificationTokenRepository-1] GetDataByToken: %v", err)
 			return nil, err
 		}
@@ -33,11 +35,9 @@ func (v *VerificationTokenRepository) GetDataByToken(ctx context.Context, token 
 		return nil, err
 	}
 
-	currentTime := time.Now()
-	if currentTime.Before(modelToken.ExpiresAt) {
-		err := errors.New("401")
-		log.Printf("[VerificationTokenRepository-3] CreateVerificationToken: %v", err)
-		return nil, err
+	if time.Now().After(modelToken.ExpiresAt) {
+		log.Printf("[VerificationTokenRepository-3] GetDataByToken: token expired")
+		return nil, apperror.ErrUnauthorized
 	}
 
 	return &entity.VerificationTokenEntity{
@@ -56,10 +56,21 @@ func (v *VerificationTokenRepository) CreateVerificationToken(ctx context.Contex
 		UserID:    req.UserID,
 		Token:     req.Token,
 		TokenType: req.TokenType,
+		ExpiresAt: time.Now().Add(24 * time.Hour),
 	}
 
 	if err := v.db.Create(&modelVerificationToken).Error; err != nil {
 		log.Printf("[VerificationTokenRepository-1] CreateVerificationToken: %v", err)
+		return err
+	}
+
+	return nil
+}
+
+// DeleteTokenByID implements [VerificationTokenRepositoryInterface].
+func (v *VerificationTokenRepository) DeleteTokenByID(ctx context.Context, id int64) error {
+	if err := v.db.Where("id = ?", id).Delete(&model.VerificationToken{}).Error; err != nil {
+		log.Printf("[VerificationTokenRepository-5] DeleteTokenByID: %v", err)
 		return err
 	}
 

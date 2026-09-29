@@ -1,11 +1,14 @@
 package handler
 
 import (
+	"encoding/json"
+	"errors"
 	"net/http"
 	"user-service/config"
 	"user-service/internal/adapter"
 	"user-service/internal/adapter/handler/request"
 	"user-service/internal/adapter/handler/response"
+	"user-service/internal/core/domain/apperror"
 	"user-service/internal/core/domain/entity"
 	"user-service/internal/core/service"
 
@@ -20,10 +23,66 @@ type UserHandlerInterface interface {
 	ForgotPassword(c echo.Context) error
 	VerifyAccount(c echo.Context) error
 	UpdatePassword(c echo.Context) error
+	GetProfileUser(c echo.Context) error
 }
 
 type userHandler struct {
 	userService service.UserServiceInterface
+}
+
+// GetProfileUser implements [UserHandlerInterface].
+func (u *userHandler) GetProfileUser(c echo.Context) error {
+	var (
+		resp        = response.DefaultResponse{}
+		respProfile = response.ProfileResponse{}
+		ctx         = c.Request().Context()
+		jwtUserData = entity.JwtUserData{}
+	)
+
+	user, ok := c.Get("user").(string)
+	if !ok || user == "" {
+		log.Errorf("[UserHandler-1] GetProfileUser %s", "data token not found")
+		resp.Message = "user not found"
+		resp.Data = nil
+		return c.JSON(http.StatusNotFound, resp)
+	}
+	err := json.Unmarshal([]byte(user), &jwtUserData)
+	if err != nil {
+		log.Errorf("[UserHandler-2] GetProfileUser %v", err)
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusBadRequest, resp)
+	}
+
+	userID := jwtUserData.UserID
+
+	dataUser, err := u.userService.GetProfileUser(ctx, userID)
+	if err != nil {
+		log.Errorf("[UserHandler-3] GetProfileUser %v", err)
+		if errors.Is(err, apperror.ErrNotFound) {
+			resp.Message = "user not found"
+			resp.Data = nil
+			return c.JSON(http.StatusNotFound, resp)
+		}
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusInternalServerError, resp)
+	}
+
+	respProfile.Address = dataUser.Address
+	respProfile.Name = dataUser.Name
+	respProfile.Email = dataUser.Email
+	respProfile.ID = dataUser.ID
+	respProfile.Lat = dataUser.Lat
+	respProfile.Lng = dataUser.Lng
+	respProfile.Phone = dataUser.Phone
+	respProfile.Photo = dataUser.Photo
+	respProfile.RoleName = dataUser.RoleName
+
+	resp.Message = "success"
+	resp.Data = respProfile
+
+	return c.JSON(http.StatusOK, resp)
 }
 
 // UpdatePassword implements [UserHandlerInterface].
@@ -71,21 +130,19 @@ func (u *userHandler) UpdatePassword(c echo.Context) error {
 	err := u.userService.UpdatePassword(ctx, reqEntity)
 	if err != nil {
 		log.Errorf("[UserHandler-5] UpdatePassword %v", err)
-		if err != nil {
-			if err.Error() == "404" {
-				resp.Message = "User not found"
-				resp.Data = nil
-				return c.JSON(http.StatusNotFound, resp)
-			}
-			if err.Error() == "401" {
-				resp.Message = "Token expired or invalid"
-				resp.Data = nil
-				return c.JSON(http.StatusUnauthorized, resp)
-			}
-			resp.Message = err.Error()
+		if errors.Is(err, apperror.ErrNotFound) {
+			resp.Message = "User not found"
 			resp.Data = nil
-			return c.JSON(http.StatusInternalServerError, resp)
+			return c.JSON(http.StatusNotFound, resp)
 		}
+		if errors.Is(err, apperror.ErrUnauthorized) {
+			resp.Message = "Token expired or invalid"
+			resp.Data = nil
+			return c.JSON(http.StatusUnauthorized, resp)
+		}
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusInternalServerError, resp)
 	}
 
 	resp.Data = nil
@@ -113,12 +170,12 @@ func (u *userHandler) VerifyAccount(c echo.Context) error {
 	user, err := u.userService.VerifyToken(ctx, tokenString)
 	if err != nil {
 		log.Errorf("[UserHandler-2] VerifyAccount: %v", err)
-		if err.Error() == "404" {
+		if errors.Is(err, apperror.ErrNotFound) {
 			resp.Message = "User not found"
 			resp.Data = nil
 			return c.JSON(http.StatusNotFound, resp)
 		}
-		if err.Error() == "401" {
+		if errors.Is(err, apperror.ErrUnauthorized) {
 			resp.Message = "Token expired or invalid"
 			resp.Data = nil
 			return c.JSON(http.StatusUnauthorized, resp)
@@ -173,7 +230,7 @@ func (u *userHandler) ForgotPassword(c echo.Context) error {
 	err = u.userService.ForgotPassword(ctx, reqEntity)
 	if err != nil {
 		log.Errorf("[UserHandler-3] Forgot Password: %v", err)
-		if err.Error() == "404" {
+		if errors.Is(err, apperror.ErrNotFound) {
 			resp.Message = "User not found"
 			resp.Data = nil
 			return c.JSON(http.StatusInternalServerError, resp)
@@ -268,7 +325,7 @@ func (u *userHandler) SignIn(c echo.Context) error {
 
 	user, token, err := u.userService.SignIn(ctx, reqEntity)
 	if err != nil {
-		if err.Error() == "404" {
+		if errors.Is(err, apperror.ErrNotFound) {
 			log.Errorf("[UserHandler-3] SignIn: %s", "User Not Found")
 			resp.Message = "User Not Found"
 			resp.Data = nil
@@ -295,7 +352,7 @@ func (u *userHandler) SignIn(c echo.Context) error {
 	return c.JSON(http.StatusOK, resp)
 }
 
-func NewUserHandler(e *echo.Echo, userService service.UserServiceInterface, cfg *config.Config) UserHandlerInterface {
+func NewUserHandler(e *echo.Echo, userService service.UserServiceInterface, cfg *config.Config, jwtService service.JWTServiceInterface) UserHandlerInterface {
 	userHandler := &userHandler{userService: userService}
 
 	e.Use(middleware.Recover())
@@ -305,12 +362,17 @@ func NewUserHandler(e *echo.Echo, userService service.UserServiceInterface, cfg 
 	e.GET("/verify-account", userHandler.VerifyAccount)
 	e.PUT("/update-password", userHandler.UpdatePassword)
 
-	mid := adapter.NewMiddlewareAdapter(cfg)
+	mid := adapter.NewMiddlewareAdapter(cfg, jwtService)
+
 	adminGroup := e.Group("/admin")
 	adminGroup.Use(mid.CheckToken())
 	adminGroup.GET("/check", func(c echo.Context) error {
 		return c.String(200, "Admin route accessed successfully")
 	})
+
+	profileGroup := e.Group("/profile")
+	profileGroup.Use(mid.CheckToken())
+	profileGroup.GET("", userHandler.GetProfileUser)
 
 	return userHandler
 }

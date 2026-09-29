@@ -5,6 +5,7 @@ import (
 	"strings"
 	"user-service/config"
 	"user-service/internal/adapter/handler/response"
+	"user-service/internal/core/service"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/gommon/log"
@@ -15,7 +16,8 @@ type MiddlewareAdapterInterface interface {
 }
 
 type middlewareAdapter struct {
-	cfg *config.Config
+	cfg        *config.Config
+	jwtService service.JWTServiceInterface
 }
 
 // CheckToken implements [MiddlewareAdapterInterface].
@@ -34,10 +36,18 @@ func (m *middlewareAdapter) CheckToken() echo.MiddlewareFunc {
 
 			tokenString := strings.TrimPrefix(authHeader, "Bearer ")
 
+			_, err := m.jwtService.ValidateToken(tokenString)
+			if err != nil {
+				log.Errorf("[MiddlewareAdapter-2] CheckToken: %s", err.Error())
+				respErr.Message = err.Error()
+				respErr.Data = nil
+				return e.JSON(http.StatusUnauthorized, respErr)
+			}
+
 			getSession, err := redisConn.Get(e.Request().Context(), tokenString).Result()
 			if err != nil || len(getSession) == 0 {
-				log.Errorf("[MiddlewareAdapter-2] CheckToken: %s", "Invalid or expired token")
-				respErr.Message = err.Error()
+				log.Errorf("[MiddlewareAdapter-3] CheckToken: %s", "Invalid or expired token")
+				respErr.Message = "Invalid or expired token"
 				respErr.Data = (*interface{})(nil)
 				return e.JSON(http.StatusUnauthorized, respErr)
 			}
@@ -48,6 +58,6 @@ func (m *middlewareAdapter) CheckToken() echo.MiddlewareFunc {
 	}
 }
 
-func NewMiddlewareAdapter(cfg *config.Config) MiddlewareAdapterInterface {
-	return &middlewareAdapter{cfg: cfg}
+func NewMiddlewareAdapter(cfg *config.Config, jwtService service.JWTServiceInterface) MiddlewareAdapterInterface {
+	return &middlewareAdapter{cfg: cfg, jwtService: jwtService}
 }

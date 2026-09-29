@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log"
 	"time"
+	"user-service/internal/core/domain/apperror"
 	"user-service/internal/core/domain/entity"
 	"user-service/internal/core/domain/model"
 
@@ -16,6 +17,7 @@ type UserRepositoryInterface interface {
 	CreateUserAccount(ctx context.Context, req entity.UserEntity) error
 	UpdateUserVerified(ctx context.Context, userID int64) (*entity.UserEntity, error)
 	UpdatePasswordByID(ctx context.Context, req entity.UserEntity) error
+	GetProfileUserByID(ctx context.Context, userID int64) (*entity.UserEntity, error)
 }
 
 type userRepository struct {
@@ -28,7 +30,7 @@ func (u *userRepository) UpdatePasswordByID(ctx context.Context, req entity.User
 
 	if err := u.db.Where("id = ?", req.ID).First(&modelUser).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			err = errors.New("404")
+			err = apperror.ErrNotFound
 			log.Printf("[UserRepository-1] UpdatePasswordByID: %v", err)
 			return err
 		}
@@ -51,7 +53,7 @@ func (u *userRepository) UpdateUserVerified(ctx context.Context, userID int64) (
 
 	if err := u.db.Where("id = ?", userID).Preload("Roles").First(&modelUser).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			err = errors.New("404")
+			err = apperror.ErrNotFound
 			log.Printf("[UserRepository-1] UpdateUserVerified: %v", err)
 			return nil, err
 		}
@@ -77,6 +79,46 @@ func (u *userRepository) UpdateUserVerified(ctx context.Context, userID int64) (
 		Photo:      modelUser.Photo,
 		IsVerified: modelUser.IsVerified,
 	}, nil
+}
+
+// GetProfileUserByID implements [UserRepositoryInterface].
+func (u *userRepository) GetProfileUserByID(ctx context.Context, userID int64) (*entity.UserEntity, error) {
+	modelUser := model.User{}
+
+	if err := u.db.WithContext(ctx).Where("id = ?", userID).
+		Preload("Roles").First(&modelUser).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			err = apperror.ErrNotFound
+			log.Printf("[UserRepository-1] GetProfileUserByID: %v", err)
+			return nil, err
+		}
+		log.Printf("[UserRepository-2] GetProfileUserByID: %v", err)
+		return nil, err
+	}
+
+	return toUserEntity(modelUser), nil
+}
+
+// toUserEntity maps a gorm user model to the entity the service layer expects.
+func toUserEntity(modelUser model.User) *entity.UserEntity {
+	roleName := ""
+	if len(modelUser.Roles) > 0 {
+		roleName = modelUser.Roles[0].Name
+	}
+
+	return &entity.UserEntity{
+		ID:         modelUser.ID,
+		Name:       modelUser.Name,
+		Email:      modelUser.Email,
+		Password:   modelUser.Password,
+		RoleName:   roleName,
+		Address:    modelUser.Address,
+		Lat:        modelUser.Lat,
+		Lng:        modelUser.Lng,
+		Phone:      modelUser.Phone,
+		Photo:      modelUser.Photo,
+		IsVerified: modelUser.IsVerified,
+	}
 }
 
 // CreateUserAccount implements [UserRepositoryInterface].
@@ -123,7 +165,7 @@ func (u *userRepository) GetUserByEmail(ctx context.Context, email string) (*ent
 	if err := u.db.Where("email = ? AND is_verified = ?", email, true).
 		Preload("Roles").First(&modelUser).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			err = errors.New("404")
+			err = apperror.ErrNotFound
 			log.Println("[UserRepository-1] GetUserByEmail: User Not Found")
 			return nil, err
 		}

@@ -9,7 +9,10 @@ type App struct {
 	JwtSecretkey string `json:"jwt_secret_key"`
 	JwtIssuer    string `json:"jwt_issuer"`
 
+	// Full URL of the frontend page that asks for the new password.
 	UrlForgotPassword string `json:"url_forgot_password"`
+	// Base URL of this API.
+	UrlApp string `json:"url_app"`
 }
 
 type PsqlDB struct {
@@ -53,6 +56,7 @@ func NewConfig() *Config {
 			JwtIssuer:    viper.GetString("JWT_ISSUER"),
 
 			UrlForgotPassword: viper.GetString("URL_FORGOT_PASSWORD"),
+			UrlApp:            viper.GetString("URL_APP"),
 		},
 		Psql: PsqlDB{
 			Host:      viper.GetString("DATABASE_HOST"),

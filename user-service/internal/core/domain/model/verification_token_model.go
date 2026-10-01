@@ -3,7 +3,7 @@ package model
 import "time"
 
 type VerificationToken struct {
-	ID        int `gorm:"primaryKey"`
+	ID        int   `gorm:"primaryKey"`
 	UserID    int64 `gorm:"index"`
 	Token     string
 	TokenType string

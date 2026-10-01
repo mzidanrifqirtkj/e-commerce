@@ -7,10 +7,10 @@ import (
 )
 
 var startCmd = &cobra.Command{
-	Use: "start",
+	Use:   "start",
 	Short: "start",
 	Long:  "start",
-	Run: func (cmd *cobra.Command, args []string)  {
+	Run: func(cmd *cobra.Command, args []string) {
 		app.RunServer()
 	},
 }

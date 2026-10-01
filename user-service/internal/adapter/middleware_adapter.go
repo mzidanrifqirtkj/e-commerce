@@ -16,7 +16,6 @@ type MiddlewareAdapterInterface interface {
 }
 
 type middlewareAdapter struct {
-	cfg        *config.Config
 	jwtService service.JWTServiceInterface
 }
 
@@ -25,12 +24,11 @@ func (m *middlewareAdapter) CheckToken() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(e echo.Context) error {
 			respErr := response.DefaultResponse{}
-			redisConn := config.NewRedisClient()
 			authHeader := e.Request().Header.Get("Authorization")
 			if authHeader == "" {
 				log.Errorf("[MiddlewareAdapter-1] CheckToken: %s", "Missing Authorization header")
 				respErr.Message = "Missing Authorization header"
-				respErr.Data = (*interface{})(nil)
+				respErr.Data = nil
 				return e.JSON(http.StatusUnauthorized, respErr)
 			}
 
@@ -44,11 +42,14 @@ func (m *middlewareAdapter) CheckToken() echo.MiddlewareFunc {
 				return e.JSON(http.StatusUnauthorized, respErr)
 			}
 
+			// Reached only for requests that carry a token, so unauthenticated
+			// traffic never touches Redis.
+			redisConn := config.NewRedisClient()
 			getSession, err := redisConn.Get(e.Request().Context(), tokenString).Result()
 			if err != nil || len(getSession) == 0 {
 				log.Errorf("[MiddlewareAdapter-3] CheckToken: %s", "Invalid or expired token")
 				respErr.Message = "Invalid or expired token"
-				respErr.Data = (*interface{})(nil)
+				respErr.Data = nil
 				return e.JSON(http.StatusUnauthorized, respErr)
 			}
 
@@ -58,6 +59,6 @@ func (m *middlewareAdapter) CheckToken() echo.MiddlewareFunc {
 	}
 }
 
-func NewMiddlewareAdapter(cfg *config.Config, jwtService service.JWTServiceInterface) MiddlewareAdapterInterface {
-	return &middlewareAdapter{cfg: cfg, jwtService: jwtService}
+func NewMiddlewareAdapter(jwtService service.JWTServiceInterface) MiddlewareAdapterInterface {
+	return &middlewareAdapter{jwtService: jwtService}
 }

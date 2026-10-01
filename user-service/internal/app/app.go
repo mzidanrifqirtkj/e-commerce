@@ -39,7 +39,7 @@ func RunServer() {
 	en.RegisterDefaultTranslations(customValidator.Validator, customValidator.Translator)
 	e.Validator = customValidator
 
-	handler.NewUserHandler(e, userService, cfg, jwtService)
+	handler.NewUserHandler(e, userService, jwtService)
 
 	go func() {
 		if cfg.App.AppPort == "" {

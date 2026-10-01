@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"log"
 	"net/smtp"
-	"strings"
 
 	"user-service/config"
 
@@ -32,7 +31,9 @@ var workerCmd = &cobra.Command{
 		defer ch.Close()
 
 		for _, queue := range []string{"email_verification", "forgot-password"} {
-			msgs, err := ch.Consume(queue, "", true, false, false, false, nil)
+			// autoAck is false so a message is only acknowledged after the email
+			// is actually sent; a failure is requeued instead of being lost.
+			msgs, err := ch.Consume(queue, "", false, false, false, false, nil)
 			if err != nil {
 				log.Fatalf("[Worker-3] Failed to consume %s: %v", queue, err)
 			}
@@ -51,7 +52,10 @@ func handleMessages(cfg *config.Config, msgs <-chan amqp.Delivery, queue string)
 			Message string `json:"message"`
 		}
 		if err := json.Unmarshal(d.Body, &notif); err != nil {
+			// Unparseable payload can never succeed on retry, so drop it
+			// instead of requeueing forever.
 			log.Printf("[Worker-5] Failed to unmarshal from %s: %v", queue, err)
+			_ = d.Nack(false, false)
 			continue
 		}
 
@@ -68,16 +72,21 @@ func handleMessages(cfg *config.Config, msgs <-chan amqp.Delivery, queue string)
 		auth := smtp.PlainAuth("", cfg.SMTP.User, cfg.SMTP.Password, cfg.SMTP.Host)
 
 		// ponytail: net/smtp plain only, no TLS/HTML; upgrade when real delivery needed
+		// ponytail: a send failure requeues with no backoff and no attempt cap;
+		// add a retry limit or a dead-letter queue before real traffic.
 		if err := smtp.SendMail(addr, auth, cfg.SMTP.From, []string{notif.Email}, msg); err != nil {
 			log.Printf("[Worker-6] Failed to send email to %s: %v", notif.Email, err)
+			_ = d.Nack(false, true)
 			continue
 		}
+
 		log.Printf("[Worker-7] Email sent to %s via %s", notif.Email, queue)
+		if err := d.Ack(false); err != nil {
+			log.Printf("[Worker-8] Failed to ack %s: %v", queue, err)
+		}
 	}
 }
 
 func init() {
 	rootCmd.AddCommand(workerCmd)
 }
-
-var _ = strings.TrimSpace

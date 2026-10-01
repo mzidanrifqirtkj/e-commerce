@@ -28,7 +28,7 @@ type userRepository struct {
 func (u *userRepository) UpdatePasswordByID(ctx context.Context, req entity.UserEntity) error {
 	modelUser := model.User{}
 
-	if err := u.db.Where("id = ?", req.ID).First(&modelUser).Error; err != nil {
+	if err := u.db.WithContext(ctx).Where("id = ?", req.ID).First(&modelUser).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			err = apperror.ErrNotFound
 			log.Printf("[UserRepository-1] UpdatePasswordByID: %v", err)
@@ -39,7 +39,7 @@ func (u *userRepository) UpdatePasswordByID(ctx context.Context, req entity.User
 	}
 
 	modelUser.Password = req.Password
-	if err := u.db.Save(&modelUser).Error; err != nil {
+	if err := u.db.WithContext(ctx).Save(&modelUser).Error; err != nil {
 		log.Printf("[UserRepository-3] UpdatePasswordByID: %v", err)
 		return err
 	}
@@ -51,7 +51,8 @@ func (u *userRepository) UpdatePasswordByID(ctx context.Context, req entity.User
 func (u *userRepository) UpdateUserVerified(ctx context.Context, userID int64) (*entity.UserEntity, error) {
 	modelUser := model.User{}
 
-	if err := u.db.Where("id = ?", userID).Preload("Roles").First(&modelUser).Error; err != nil {
+	if err := u.db.WithContext(ctx).Where("id = ?", userID).
+		Preload("Roles").First(&modelUser).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			err = apperror.ErrNotFound
 			log.Printf("[UserRepository-1] UpdateUserVerified: %v", err)
@@ -62,23 +63,12 @@ func (u *userRepository) UpdateUserVerified(ctx context.Context, userID int64) (
 	}
 
 	modelUser.IsVerified = true
-	if err := u.db.Save(&modelUser).Error; err != nil {
+	if err := u.db.WithContext(ctx).Save(&modelUser).Error; err != nil {
 		log.Printf("[UserRepository-3] UpdateUserVerified: %v", err)
 		return nil, err
 	}
 
-	return &entity.UserEntity{
-		ID:         modelUser.ID,
-		Name:       modelUser.Name,
-		Email:      modelUser.Email,
-		RoleName:   modelUser.Roles[0].Name,
-		Address:    modelUser.Address,
-		Lat:        modelUser.Lat,
-		Lng:        modelUser.Lng,
-		Phone:      modelUser.Phone,
-		Photo:      modelUser.Photo,
-		IsVerified: modelUser.IsVerified,
-	}, nil
+	return toUserEntity(modelUser), nil
 }
 
 // GetProfileUserByID implements [UserRepositoryInterface].
@@ -124,7 +114,7 @@ func toUserEntity(modelUser model.User) *entity.UserEntity {
 // CreateUserAccount implements [UserRepositoryInterface].
 func (u *userRepository) CreateUserAccount(ctx context.Context, req entity.UserEntity) error {
 	modelRole := model.Role{}
-	err := u.db.Where("name = ?", "Customer").First(&modelRole).Error
+	err := u.db.WithContext(ctx).Where("name = ?", "Customer").First(&modelRole).Error
 
 	if err != nil {
 		log.Printf("[UserRepository-1] CreateUserAccount: %v", err)
@@ -138,20 +128,19 @@ func (u *userRepository) CreateUserAccount(ctx context.Context, req entity.UserE
 		Roles:    []model.Role{modelRole},
 	}
 
-	if err := u.db.Create(&modelUser).Error; err != nil {
+	if err := u.db.WithContext(ctx).Create(&modelUser).Error; err != nil {
 		log.Printf("[UserRepository-2] CreateUserAccount: %v", err)
 		return err
 	}
 
-	currentTime := time.Now()
 	modelVerify := model.VerificationToken{
 		UserID:    modelUser.ID,
 		Token:     req.Token,
-		TokenType: "email_verification",
-		ExpiresAt: currentTime.Add(time.Hour * 1),
+		TokenType: entity.TokenTypeEmailVerification,
+		ExpiresAt: time.Now().Add(24 * time.Hour),
 	}
 
-	if err := u.db.Create(&modelVerify).Error; err != nil {
+	if err := u.db.WithContext(ctx).Create(&modelVerify).Error; err != nil {
 		log.Printf("[UserRepository-3] CreateUserAccount: %v", err)
 		return err
 	}
@@ -162,7 +151,7 @@ func (u *userRepository) CreateUserAccount(ctx context.Context, req entity.UserE
 func (u *userRepository) GetUserByEmail(ctx context.Context, email string) (*entity.UserEntity, error) {
 	modelUser := model.User{}
 
-	if err := u.db.Where("email = ? AND is_verified = ?", email, true).
+	if err := u.db.WithContext(ctx).Where("email = ? AND is_verified = ?", email, true).
 		Preload("Roles").First(&modelUser).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			err = apperror.ErrNotFound
@@ -173,19 +162,7 @@ func (u *userRepository) GetUserByEmail(ctx context.Context, email string) (*ent
 		return nil, err
 	}
 
-	return &entity.UserEntity{
-		ID:         modelUser.ID,
-		Name:       modelUser.Name,
-		Email:      email,
-		Password:   modelUser.Password,
-		RoleName:   modelUser.Roles[0].Name,
-		Address:    modelUser.Address,
-		Lat:        modelUser.Lat,
-		Lng:        modelUser.Lng,
-		Phone:      modelUser.Phone,
-		Photo:      modelUser.Photo,
-		IsVerified: modelUser.IsVerified,
-	}, nil
+	return toUserEntity(modelUser), nil
 }
 
 func NewUserRepository(db *gorm.DB) UserRepositoryInterface {

@@ -46,7 +46,7 @@ func (u *userService) UpdatePassword(ctx context.Context, req entity.UserEntity)
 		return err
 	}
 
-	if token.TokenType != "reset_password" {
+	if token.TokenType != entity.TokenTypeResetPassword {
 		log.Printf("[UserService-2] UpdatePassword: wrong token type")
 		return apperror.ErrUnauthorized
 	}
@@ -82,7 +82,7 @@ func (u *userService) VerifyToken(ctx context.Context, token string) (*entity.Us
 		return nil, err
 	}
 
-	if verifyToken.TokenType != "email_verification" {
+	if verifyToken.TokenType != entity.TokenTypeEmailVerification {
 		log.Printf("[UserService-2] VerifyToken: wrong token type")
 		return nil, apperror.ErrUnauthorized
 	}
@@ -108,6 +108,12 @@ func (u *userService) VerifyToken(ctx context.Context, token string) (*entity.Us
 	redisConn := config.NewRedisClient()
 	if err = redisConn.Set(ctx, accessToken, session, time.Hour*23).Err(); err != nil {
 		log.Printf("[UserService-5] VerifyToken: %v", err)
+		return nil, err
+	}
+
+	// One-time use: a second click on the same link must not mint another session.
+	if err = u.repoToken.DeleteTokenByID(ctx, verifyToken.ID); err != nil {
+		log.Printf("[UserService-6] VerifyToken: %v", err)
 		return nil, err
 	}
 
@@ -148,7 +154,8 @@ func (u *userService) ForgotPassword(ctx context.Context, req entity.UserEntity)
 	reqEntity := entity.VerificationTokenEntity{
 		UserID:    user.ID,
 		Token:     token,
-		TokenType: "reset_password",
+		TokenType: entity.TokenTypeResetPassword,
+		ExpiresAt: time.Now().Add(30 * time.Minute),
 	}
 
 	err = u.repoToken.CreateVerificationToken(ctx, reqEntity)

@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"user-service/config"
 	"user-service/internal/adapter"
 	"user-service/internal/adapter/handler/request"
 	"user-service/internal/adapter/handler/response"
@@ -352,7 +351,7 @@ func (u *userHandler) SignIn(c echo.Context) error {
 	return c.JSON(http.StatusOK, resp)
 }
 
-func NewUserHandler(e *echo.Echo, userService service.UserServiceInterface, cfg *config.Config, jwtService service.JWTServiceInterface) UserHandlerInterface {
+func NewUserHandler(e *echo.Echo, userService service.UserServiceInterface, jwtService service.JWTServiceInterface) UserHandlerInterface {
 	userHandler := &userHandler{userService: userService}
 
 	e.Use(middleware.Recover())
@@ -362,7 +361,7 @@ func NewUserHandler(e *echo.Echo, userService service.UserServiceInterface, cfg 
 	e.GET("/verify-account", userHandler.VerifyAccount)
 	e.PUT("/update-password", userHandler.UpdatePassword)
 
-	mid := adapter.NewMiddlewareAdapter(cfg, jwtService)
+	mid := adapter.NewMiddlewareAdapter(jwtService)
 
 	adminGroup := e.Group("/admin")
 	adminGroup.Use(mid.CheckToken())

@@ -1,6 +1,7 @@
 package service
 
 import (
+	"fmt"
 	"time"
 	"user-service/config"
 
@@ -31,6 +32,12 @@ func (j *jwtService) GenerateToken(userID string) (string, error) {
 // ValidateToken implements [JWTServiceInterface].
 func (j *jwtService) ValidateToken(encodedToken string) (*jwt.Token, error) {
 	return jwt.Parse(encodedToken, func(t *jwt.Token) (interface{}, error) {
+		// Reject anything that is not HMAC so a token cannot claim another
+		// signing algorithm and be verified with a key we did not intend.
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
+		}
+
 		return []byte(j.secretKey), nil
 	})
 }

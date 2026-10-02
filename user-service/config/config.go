@@ -39,11 +39,24 @@ type SMTP struct {
 	Password string `json:"password"`
 	From     string `json:"from"`
 }
+
+type Supabase struct {
+	// Base project URL, https://<project-ref>.supabase.co, without the
+	// /rest/v1/ suffix that the generated REST endpoint adds.
+	URL string `json:"url"`
+	// Secret key. Server side only: it bypasses row level security, so it must
+	// never reach a browser or a mobile bundle.
+	Key string `json:"key"`
+	// Bucket that holds the uploaded objects.
+	Bucket string `json:"bucket"`
+}
+
 type Config struct {
 	App      App      `json:"app"`
 	Psql     PsqlDB   `json:"psql"`
 	RabbitMQ RabbitMQ `json:"rabbitmq"`
 	SMTP     SMTP     `json:"smtp"`
+	Storage  Supabase `json:"storage"`
 }
 
 func NewConfig() *Config {
@@ -79,6 +92,11 @@ func NewConfig() *Config {
 			User:     viper.GetString("SMTP_USER"),
 			Password: viper.GetString("SMTP_PASSWORD"),
 			From:     viper.GetString("SMTP_FROM"),
+		},
+		Storage: Supabase{
+			URL:    viper.GetString("SUPABASE_STORAGE_URL"),
+			Key:    viper.GetString("SUPABASE_STORAGE_KEY"),
+			Bucket: viper.GetString("SUPABASE_STORAGE_BUCKET"),
 		},
 	}
 }

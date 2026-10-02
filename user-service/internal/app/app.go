@@ -10,6 +10,7 @@ import (
 	"user-service/config"
 	"user-service/internal/adapter/handler"
 	"user-service/internal/adapter/repository"
+	"user-service/internal/adapter/storage"
 	"user-service/internal/core/service"
 	validators "user-service/utils/validator"
 
@@ -26,6 +27,8 @@ func RunServer() {
 		return
 	}
 
+	storageHandler := storage.NewSupabase(cfg)
+
 	userRepo := repository.NewUserRepository(db.DB)
 	tokenRepo := repository.NewVerificationTokenRepository(db.DB)
 
@@ -40,7 +43,7 @@ func RunServer() {
 	e.Validator = customValidator
 
 	handler.NewUserHandler(e, userService, jwtService)
-
+	handler.NewUploadImage(e, userService, jwtService, storageHandler)
 	go func() {
 		if cfg.App.AppPort == "" {
 			cfg.App.AppPort = os.Getenv("APP_PORT")

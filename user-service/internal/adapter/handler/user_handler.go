@@ -3,7 +3,9 @@ package handler
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
+	"strconv"
 	"user-service/internal/adapter"
 	"user-service/internal/adapter/handler/request"
 	"user-service/internal/adapter/handler/response"
@@ -23,10 +25,85 @@ type UserHandlerInterface interface {
 	VerifyAccount(c echo.Context) error
 	UpdatePassword(c echo.Context) error
 	GetProfileUser(c echo.Context) error
+	UpdateDataUser(c echo.Context) error
 }
 
 type userHandler struct {
 	userService service.UserServiceInterface
+}
+
+// UpdateDataUser implements [UserHandlerInterface].
+func (u *userHandler) UpdateDataUser(c echo.Context) error {
+	var (
+		resp        = response.DefaultResponse{}
+		ctx         = c.Request().Context()
+		req         = request.UpdateDataUserRequest{}
+		jwtUserData = entity.JwtUserData{}
+	)
+
+	user := c.Get("user").(string)
+	if user == "" {
+		log.Errorf("[UserHandler-1] UpdateDataUser %s", "data token not found")
+		resp.Message = "data token not found"
+		resp.Data = nil
+		return c.JSON(http.StatusNotFound, resp)
+	}
+	err := json.Unmarshal([]byte(user), &jwtUserData)
+	if err != nil {
+		log.Errorf("[UserHandler-2] UpdateDataUser %v", err)
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusBadRequest, resp)
+	}
+
+	userID := jwtUserData.UserID
+
+	if err = c.Bind(&req); err != nil {
+		log.Errorf("[UserHandler-3] UpdateDataUser %v", err)
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusBadRequest, resp)
+	}
+
+	if err = c.Validate(req); err != nil {
+		log.Errorf("[UserHandler-4] UpdateDataUser %v", err)
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusUnprocessableEntity, resp)
+	}
+
+	latString := strconv.FormatFloat(req.Lat, 'g', -1, 64)
+	lngString := strconv.FormatFloat(req.Lng, 'g', -1, 64)
+	phoneString := fmt.Sprintf("%d", req.Phone)
+
+	reqEntity := entity.UserEntity{
+		ID:      userID,
+		Name:    req.Name,
+		Email:   req.Email,
+		Address: req.Address,
+		Phone:   phoneString,
+		Photo:   req.Photo,
+		Lat:     latString,
+		Lng:     lngString,
+	}
+
+	err = u.userService.UpdateDataUser(ctx, reqEntity)
+	if err != nil {
+		log.Errorf("[UserHandler-5] UpdateDataUser %v", err)
+		if errors.Is(err, apperror.ErrNotFound) {
+			resp.Message = "user not found"
+			resp.Data = nil
+			return c.JSON(http.StatusNotFound, resp)
+		}
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusInternalServerError, resp)
+	}
+
+	resp.Message = "success"
+	resp.Data = nil
+
+	return c.JSON(http.StatusOK, resp)
 }
 
 // GetProfileUser implements [UserHandlerInterface].
@@ -372,6 +449,7 @@ func NewUserHandler(e *echo.Echo, userService service.UserServiceInterface, jwtS
 	profileGroup := e.Group("/profile")
 	profileGroup.Use(mid.CheckToken())
 	profileGroup.GET("", userHandler.GetProfileUser)
+	profileGroup.PUT("", userHandler.UpdateDataUser)
 
 	return userHandler
 }

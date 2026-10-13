@@ -31,9 +31,11 @@ func RunServer() {
 
 	userRepo := repository.NewUserRepository(db.DB)
 	tokenRepo := repository.NewVerificationTokenRepository(db.DB)
+	roleRepo := repository.NewRoleRepository(db.DB)
 
 	jwtService := service.NewJwtService(cfg)
 	userService := service.NewUserService(userRepo, cfg, jwtService, tokenRepo)
+	roleService := service.NewRoleService(roleRepo)
 
 	e := echo.New()
 	e.Use(middleware.CORS())
@@ -44,6 +46,7 @@ func RunServer() {
 
 	handler.NewUserHandler(e, userService, jwtService)
 	handler.NewUploadImage(e, userService, jwtService, storageHandler)
+	handler.NewRoleHandler(e, roleService, cfg, jwtService)
 	go func() {
 		if cfg.App.AppPort == "" {
 			cfg.App.AppPort = os.Getenv("APP_PORT")

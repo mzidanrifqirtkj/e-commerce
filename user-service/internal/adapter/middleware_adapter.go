@@ -1,10 +1,12 @@
 package adapter
 
 import (
+	"encoding/json"
 	"net/http"
 	"strings"
 	"user-service/config"
 	"user-service/internal/adapter/handler/response"
+	"user-service/internal/core/domain/entity"
 	"user-service/internal/core/service"
 
 	"github.com/labstack/echo/v4"
@@ -51,6 +53,24 @@ func (m *middlewareAdapter) CheckToken() echo.MiddlewareFunc {
 				respErr.Message = "Invalid or expired token"
 				respErr.Data = nil
 				return e.JSON(http.StatusUnauthorized, respErr)
+			}
+
+			jwtUserData := entity.JwtUserData{}
+			err = json.Unmarshal([]byte(getSession), &jwtUserData)
+			if err != nil {
+				log.Errorf("[MiddlewareAdapter-4] CheckToken: %s", "Missing Authorization header")
+				respErr.Message = err.Error()
+				respErr.Data = nil
+				return e.JSON(http.StatusInternalServerError, respErr)
+			}
+
+			path := e.Request().URL.Path
+			segments := strings.Split(strings.Trim(path, "/"), "/")
+			if jwtUserData.RoleName == "Customer" && segments[0] == "admin" {
+				log.Errorf("[MiddlewareAdapter-4] CheckToken: %s", "customer cannot access admin routee")
+				respErr.Message = "customer cannot adcces admin roeutes"
+				respErr.Data = nil
+				return e.JSON(http.StatusForbidden, respErr)
 			}
 
 			e.Set("user", getSession)

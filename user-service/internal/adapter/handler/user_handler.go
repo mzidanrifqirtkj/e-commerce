@@ -448,8 +448,8 @@ func NewUserHandler(e *echo.Echo, userService service.UserServiceInterface, jwtS
 
 	profileGroup := e.Group("/profile")
 	profileGroup.Use(mid.CheckToken())
-	profileGroup.GET("", userHandler.GetProfileUser)
-	profileGroup.PUT("", userHandler.UpdateDataUser)
+	profileGroup.GET("/profile", userHandler.GetProfileUser)
+	profileGroup.PUT("/profile", userHandler.UpdateDataUser)
 
 	return userHandler
 }

@@ -138,6 +138,7 @@ func toSession(user *entity.UserEntity, accessToken string) (string, error) {
 		"logged_in":  true,
 		"created_at": time.Now(),
 		"token":      accessToken,
+		"role_name":  user.RoleName,
 	}
 
 	raw, err := json.Marshal(sessionData)

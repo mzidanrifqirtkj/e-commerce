@@ -4,3 +4,16 @@ type DefaultResponse struct {
 	Message string      `json:"message"`
 	Data    interface{} `json:"data"`
 }
+
+type DefaultResponseWithPagination struct {
+	Message    string              `json:"message"`
+	Data       interface{}         `json:"data"`
+	Pagination *PaginationResponse `json:"pagination,omitempty"`
+}
+
+type PaginationResponse struct {
+	Page       int64 `json:"page"`
+	TotalCount int64 `json:"total_count"`
+	PerPage    int64 `json:"limit"`
+	TotalPage  int64 `json:"total_page"`
+}

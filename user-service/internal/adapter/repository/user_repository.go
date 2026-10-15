@@ -3,7 +3,9 @@ package repository
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
+	"math"
 	"time"
 	"user-service/internal/core/domain/apperror"
 	"user-service/internal/core/domain/entity"
@@ -19,10 +21,61 @@ type UserRepositoryInterface interface {
 	UpdatePasswordByID(ctx context.Context, req entity.UserEntity) error
 	GetProfileUserByID(ctx context.Context, userID int64) (*entity.UserEntity, error)
 	UpdateDataUser(ctx context.Context, req entity.UserEntity) error
+
+	// Modul Customers Admin
+	GetCustomerAll(ctx context.Context, query entity.QueryStringCustomer) ([]entity.UserEntity, int64, int64, error)
 }
 
 type userRepository struct {
 	db *gorm.DB
+}
+
+// GetAll implements [UserRepositoryInterface].
+func (u *userRepository) GetCustomerAll(ctx context.Context, query entity.QueryStringCustomer) ([]entity.UserEntity, int64, int64, error) {
+	modelUsers := []model.User{}
+	var countData int64
+
+	order := fmt.Sprintf("%s %s", query.OrderBy, query.OrderType)
+	offset := (query.Page - 1) * query.Limit
+
+	sqlMain := u.db.Preload("Roles", "name = ?", "Customer").
+		Where("name ILIKE ? OR email ILIKE ?", "%"+query.Search+"%", "%"+query.Search+"%")
+
+	if err := sqlMain.Model(&modelUsers).Count(&countData).Error; err != nil {
+		log.Printf("[UserRepository-1] GetCustomerAll: %v", err)
+		return nil, 0, 0, err
+	}
+
+	totalPage := int(math.Ceil(float64(countData) / float64(query.Limit)))
+
+	if err := sqlMain.Order(order).Limit(int(query.Limit)).Offset(int(offset)).Find(&modelUsers).Error; err != nil {
+		log.Printf("[UserRepository-2] GetCustomerAll: No Customer found")
+		return nil, 0, 0, err
+	}
+
+	// if err := u.db.Preload("Roles", "name = ?", "Customer").Find(&modelUsers).Error; err {
+	// 	log.Printf( "[UserRepository-1] GetCustomerAll: %v", err)
+	// 	return nil, err
+	// }
+
+	if len(modelUsers) < 1 {
+		err := apperror.ErrNotFound
+		log.Printf("[UserRepository-3] GetCustomerAll: No Customer found")
+		return nil, 0, 0, err
+	}
+
+	respEntities := []entity.UserEntity{}
+	for _, val := range modelUsers {
+		respEntities = append(respEntities, entity.UserEntity{
+			ID:       val.ID,
+			Name:     val.Name,
+			Email:    val.Email,
+			RoleName: val.Roles[0].Name,
+			Phone:    val.Phone,
+			Photo:    val.Photo,
+		})
+	}
+	return respEntities, countData, int64(totalPage), nil
 }
 
 // UpdateDataUser implements [UserRepositoryInterface].

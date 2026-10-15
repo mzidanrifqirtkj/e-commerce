@@ -60,7 +60,7 @@ func (r *roleHandler) Create(c echo.Context) error {
 		Name: req.Name,
 	}
 
-	err = r.roleService.Create(ctx, roleEntity)
+	err := r.roleService.Create(ctx, roleEntity)
 	if err != nil {
 		log.Errorf("RoleHandler-3 Create: %v", err)
 		resp.Message = err.Error()

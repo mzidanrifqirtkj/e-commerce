@@ -6,7 +6,7 @@ import "errors"
 
 var (
 	// ErrNotFound means the requested row does not exist.
-	ErrNotFound = errors.New("404, user not found")
+	ErrNotFound = errors.New("404, not found")
 	// ErrUnauthorized means a token is expired, already used, or of the wrong type.
 	ErrUnauthorized = errors.New("401, unauthorized")
 	// ErrInvalidPassword means the supplied password does not match the stored hash.

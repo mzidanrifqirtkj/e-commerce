@@ -24,10 +24,41 @@ type UserRepositoryInterface interface {
 
 	// Modul Customers Admin
 	GetCustomerAll(ctx context.Context, query entity.QueryStringCustomer) ([]entity.UserEntity, int64, int64, error)
+	GetCustomerByID(ctx context.Context, customerID int64) (*entity.UserEntity, int64, int64, error)
 }
 
 type userRepository struct {
 	db *gorm.DB
+}
+
+// GetCustomerByID implements [UserRepositoryInterface].
+func (u *userRepository) GetCustomerByID(ctx context.Context, customerID int64) (*entity.UserEntity, int64, int64, error) {
+	modelUser := model.User{}
+	if err := u.db.Where("id = ?", customerID).Preload("Roles").First(&modelUser).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			log.Printf("[UserRepository-1] GetCustomerByID: Customer not found")
+			return nil, 0, 0, apperror.ErrNotFound
+		}
+		log.Printf("[UserRepository-2] GetCustomerByID: %v", err)
+		return nil, 0, 0, err
+	}
+
+	if modelUser.ID == 0 || len(modelUser.Roles) < 1 {
+		log.Printf("[UserRepository-3] GetCustomerByID: Customer not found")
+		return nil, 0, 0, apperror.ErrNotFound
+	}
+
+	return &entity.UserEntity{
+		ID:      modelUser.ID,
+		Name:    modelUser.Name,
+		Email:   modelUser.Email,
+		RoleID:  modelUser.Roles[0].ID,
+		Phone:   modelUser.Phone,
+		Address: modelUser.Address,
+		Photo:   modelUser.Photo,
+		Lat:     modelUser.Lat,
+		Lng:     modelUser.Lng,
+	}, 0, 0, nil
 }
 
 // GetAll implements [UserRepositoryInterface].

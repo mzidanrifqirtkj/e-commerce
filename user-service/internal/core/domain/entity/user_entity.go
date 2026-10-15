@@ -13,6 +13,7 @@ type UserEntity struct {
 	IsVerified bool
 	RoleName   string
 	Token      string
+	RoleID     int64
 }
 
 type QueryStringCustomer struct {

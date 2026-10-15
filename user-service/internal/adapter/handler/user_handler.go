@@ -28,11 +28,71 @@ type UserHandlerInterface interface {
 	GetProfileUser(c echo.Context) error
 	UpdateDataUser(c echo.Context) error
 
+	// Modul Customers Admin
 	GetCustomerAll(c echo.Context) error
+	GetCustomerByID(c echo.Context) error
 }
 
 type userHandler struct {
 	userService service.UserServiceInterface
+}
+
+// GetCustomerByID implements [UserHandlerInterface].
+func (u *userHandler) GetCustomerByID(c echo.Context) error {
+	var (
+		resp     = response.DefaultResponseWithPagination{}
+		ctx      = c.Request().Context()
+		respUser = response.CustomerResponse{}
+	)
+
+	user := c.Get("user").(string)
+	if user == "" {
+		log.Errorf("[UserHandler-1] GetCustomerByID %s", "data token not valid")
+		resp.Message = "data token not valid"
+		resp.Data = nil
+		return c.JSON(http.StatusUnauthorized, resp)
+	}
+
+	idParam := c.Param("id")
+	if idParam == "" {
+		log.Errorf("[UserHandler-2] GetCustomerByID %s", "id invalid")
+		resp.Message = "id invalid"
+		resp.Data = nil
+		return c.JSON(http.StatusBadRequest, resp)
+	}
+
+	id, err := strconv.ParseInt(idParam, 10, 64)
+	if err != nil {
+		log.Errorf("[UserHandler-3] GetCustomerByID %v", err)
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusBadRequest, resp)
+	}
+
+	result, _, _, err := u.userService.GetCustomerByID(ctx, id)
+	if err != nil {
+		log.Errorf("[UserHandler-4] GetCustomerByID %v", err)
+		if err == apperror.ErrNotFound {
+			resp.Message = "customer not found"
+			resp.Data = nil
+			return c.JSON(http.StatusNotFound, resp)
+		}
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusInternalServerError, resp)
+	}
+
+	respUser = response.CustomerResponse{
+		ID:    result.ID,
+		Name:  result.Name,
+		Email: result.Email,
+		Photo: result.Photo,
+		Phone: result.Phone,
+	}
+
+	resp.Message = "Data retrieved successfully"
+	resp.Data = respUser
+	return c.JSON(http.StatusOK, resp)
 }
 
 // GetCustomerAll implements [UserHandlerInterface].
@@ -526,6 +586,7 @@ func NewUserHandler(e *echo.Echo, userService service.UserServiceInterface, jwtS
 	adminGroup := e.Group("/admin")
 	adminGroup.Use(mid.CheckToken())
 	adminGroup.GET("/customers", userHandler.GetCustomerAll)
+	adminGroup.GET("/customers/{id}", userHandler.GetCustomerByID)
 	adminGroup.GET("/check", func(c echo.Context) error {
 		return c.String(200, "Admin route accessed successfully")
 	})

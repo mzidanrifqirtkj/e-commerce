@@ -22,11 +22,11 @@ type UpdatePasswordRequest struct {
 }
 
 type UpdateDataUserRequest struct {
-	Name    string  `json:"name" validate:"required"`
-	Email   string  `json:"email" validate:"email,required"`
-	Phone   int64   `json:"phone" validate:"required,number"`
-	Address string  `json:"address" validate:"required"`
-	Photo   string  `json:"photo" validate:"required"`
-	Lat     float64 `json:"lat" validate:"required"`
-	Lng     float64 `json:"lng" validate:"required"`
+	Name    string `json:"name" validate:"required"`
+	Email   string `json:"email" validate:"email,required"`
+	Phone   int64  `json:"phone" validate:"required,number"`
+	Address string `json:"address" validate:"required"`
+	Photo   string `json:"photo" validate:"required"`
+	Lat     string `json:"lat" validate:"required"`
+	Lng     string `json:"lng" validate:"required"`
 }

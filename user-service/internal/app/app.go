@@ -29,6 +29,10 @@ func RunServer() {
 
 	storageHandler := storage.NewSupabase(cfg)
 
+	// Built eagerly so a missing REDIS_HOST/REDIS_PORT fails at startup instead
+	// of surfacing as a misleading 401 from the token middleware.
+	config.NewRedisClient()
+
 	userRepo := repository.NewUserRepository(db.DB)
 	tokenRepo := repository.NewVerificationTokenRepository(db.DB)
 	roleRepo := repository.NewRoleRepository(db.DB)

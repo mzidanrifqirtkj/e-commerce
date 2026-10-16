@@ -416,8 +416,6 @@ func (u *userHandler) UpdateDataUser(c echo.Context) error {
 		return c.JSON(http.StatusUnprocessableEntity, resp)
 	}
 
-	latString := strconv.FormatFloat(req.Lat, 'g', -1, 64)
-	lngString := strconv.FormatFloat(req.Lng, 'g', -1, 64)
 	phoneString := fmt.Sprintf("%d", req.Phone)
 
 	reqEntity := entity.UserEntity{
@@ -427,8 +425,8 @@ func (u *userHandler) UpdateDataUser(c echo.Context) error {
 		Address: req.Address,
 		Phone:   phoneString,
 		Photo:   req.Photo,
-		Lat:     latString,
-		Lng:     lngString,
+		Lat:     req.Lat,
+		Lng:     req.Lng,
 	}
 
 	err = u.userService.UpdateDataUser(ctx, reqEntity)

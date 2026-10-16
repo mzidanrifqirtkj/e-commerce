@@ -1,13 +1,13 @@
 package config
 
 import (
-	"context"
+	"net"
 	"sync"
 
 	"github.com/go-redis/redis/v8"
+	"github.com/rs/zerolog/log"
+	"github.com/spf13/viper"
 )
-
-var Ctx = context.Background()
 
 var (
 	redisClient *redis.Client
@@ -21,12 +21,21 @@ var (
 // Commands fail with an error when Redis is unreachable, which the callers
 // already handle, so there is no connect-time Ping here.
 //
-// ponytail: address is hardcoded; move to REDIS_HOST/REDIS_PORT config when
-// more than one environment has to point somewhere else.
+// The address comes from REDIS_HOST/REDIS_PORT, which the process is expected
+// to have already loaded. A missing pair is fatal here rather than silent: the
+// resulting ":" address would otherwise only surface as a misleading 401 from
+// the token middleware on the first request.
 func NewRedisClient() *redis.Client {
 	redisOnce.Do(func() {
+		host := viper.GetString("REDIS_HOST")
+		port := viper.GetString("REDIS_PORT")
+
+		if host == "" || port == "" {
+			log.Fatal().Msg("[NewRedisClient-1] REDIS_HOST/REDIS_PORT is not set")
+		}
+
 		redisClient = redis.NewClient(&redis.Options{
-			Addr: "localhost:6380",
+			Addr: net.JoinHostPort(host, port),
 		})
 	})
 

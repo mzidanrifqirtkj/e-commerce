@@ -10,6 +10,7 @@ import (
 	"user-service/internal/core/domain/apperror"
 	"user-service/internal/core/domain/entity"
 	"user-service/internal/core/domain/model"
+	"user-service/utils"
 
 	"gorm.io/gorm"
 )
@@ -25,10 +26,132 @@ type UserRepositoryInterface interface {
 	// Modul Customers Admin
 	GetCustomerAll(ctx context.Context, query entity.QueryStringCustomer) ([]entity.UserEntity, int64, int64, error)
 	GetCustomerByID(ctx context.Context, customerID int64) (*entity.UserEntity, int64, int64, error)
+	CreateCustomer(ctx context.Context, req entity.UserEntity) error
+	UpdateCustomer(ctx context.Context, req entity.UserEntity) error
+	DeleteCustomer(ctx context.Context, customerID int64) error
 }
 
 type userRepository struct {
 	db *gorm.DB
+}
+
+// UpdateCustomer implements [UserRepositoryInterface].
+func (u *userRepository) UpdateCustomer(ctx context.Context, req entity.UserEntity) error {
+	err := u.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		modelUser := model.User{}
+		if err := tx.Where("id = ?", req.ID).Preload("Roles").First(&modelUser).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return apperror.ErrNotFound
+			}
+			return err
+		}
+
+		// A map of columns keeps Updates from touching the preloaded Roles association.
+		updates := map[string]any{
+			"name":    req.Name,
+			"email":   req.Email,
+			"phone":   req.Phone,
+			"address": req.Address,
+			"photo":   req.Photo,
+			"lat":     req.Lat,
+			"lng":     req.Lng,
+		}
+		if req.Password != "" {
+			updates["password"] = req.Password
+		}
+
+		if err := tx.Model(&modelUser).Updates(updates).Error; err != nil {
+			return err
+		}
+
+		// Role only changes when the request names a different one.
+		if req.RoleID != 0 && (len(modelUser.Roles) == 0 || modelUser.Roles[0].ID != req.RoleID) {
+			modelRole := model.Role{}
+			if err := tx.Where("id = ?", req.RoleID).First(&modelRole).Error; err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					return apperror.ErrNotFound
+				}
+				return err
+			}
+
+			if err := tx.Model(&modelUser).Association("Roles").Replace(&modelRole); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	})
+	if err != nil {
+		log.Printf("[UserRepository-1] UpdateCustomer: %v", err)
+		return err
+	}
+
+	return nil
+}
+
+// DeleteCustomer implements [UserRepositoryInterface].
+// ponytail: hard delete. model.User.DeletedAt is *time.Time, not gorm.DeletedAt,
+// so GORM would not soft-delete anyway; add gorm.DeletedAt plus deleted_at
+// filters in the read queries if rows must stay recoverable.
+func (u *userRepository) DeleteCustomer(ctx context.Context, customerID int64) error {
+	err := u.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		modelUser := model.User{}
+		if err := tx.Where("id = ?", customerID).First(&modelUser).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return apperror.ErrNotFound
+			}
+			return err
+		}
+
+		// user_role has no ON DELETE CASCADE, so the join rows block the delete.
+		if err := tx.Model(&modelUser).Association("Roles").Clear(); err != nil {
+			return err
+		}
+
+		return tx.Delete(&modelUser).Error
+	})
+	if err != nil {
+		log.Printf("[UserRepository-1] DeleteCustomer: %v", err)
+		return err
+	}
+
+	return nil
+}
+
+// CreateCustomer implements [UserRepositoryInterface].
+func (u *userRepository) CreateCustomer(ctx context.Context, req entity.UserEntity) error {
+	modelUser := model.User{
+		Name:       req.Name,
+		Email:      req.Email,
+		Password:   req.Password,
+		Phone:      req.Phone,
+		Address:    req.Address,
+		Photo:      req.Photo,
+		Lat:        req.Lat,
+		Lng:        req.Lng,
+		IsVerified: true,
+	}
+
+	err := u.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		modelRole := model.Role{}
+		if err := tx.Where("id = ?", req.RoleID).First(&modelRole).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return apperror.ErrNotFound
+			}
+			return err
+		}
+
+		// Create writes the user_role join row itself; no separate Append needed.
+		modelUser.Roles = []model.Role{modelRole}
+
+		return tx.Create(&modelUser).Error
+	})
+	if err != nil {
+		log.Printf("[UserRepository-1] CreateCustomer: %v", err)
+		return err
+	}
+
+	return nil
 }
 
 // GetCustomerByID implements [UserRepositoryInterface].
@@ -251,7 +374,7 @@ func (u *userRepository) CreateUserAccount(ctx context.Context, req entity.UserE
 	modelVerify := model.VerificationToken{
 		UserID:    modelUser.ID,
 		Token:     req.Token,
-		TokenType: entity.TokenTypeEmailVerification,
+		TokenType: utils.NOTIF_EMAIL_VERIFICATION,
 		ExpiresAt: time.Now().Add(24 * time.Hour),
 	}
 

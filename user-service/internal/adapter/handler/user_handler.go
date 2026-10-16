@@ -31,10 +31,211 @@ type UserHandlerInterface interface {
 	// Modul Customers Admin
 	GetCustomerAll(c echo.Context) error
 	GetCustomerByID(c echo.Context) error
+	CreateCustomer(c echo.Context) error
+	UpdateCustomer(c echo.Context) error
+	DeleteCustomer(c echo.Context) error
 }
 
 type userHandler struct {
 	userService service.UserServiceInterface
+}
+
+// CreateCustomer implements [UserHandlerInterface].
+func (u *userHandler) CreateCustomer(c echo.Context) error {
+	var (
+		req  = request.CustomerRequest{}
+		resp = response.DefaultResponse{}
+		ctx  = c.Request().Context()
+	)
+
+	user := c.Get("user").(string)
+	if user == "" {
+		log.Errorf("[UserHandler-1] CreateCustomer %s", "data token not found")
+		resp.Message = "data token not found"
+		resp.Data = nil
+		return c.JSON(http.StatusUnauthorized, resp)
+	}
+
+	if err := c.Bind(&req); err != nil {
+		log.Errorf("[UserHandler-2] CreateCustomer %v", err)
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusBadRequest, resp)
+	}
+
+	if err := c.Validate(req); err != nil {
+		log.Errorf("[UserHandler-3] CreateCustomer %v", err)
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusUnprocessableEntity, resp)
+	}
+
+	if req.Password != req.PasswordConfirmation {
+		log.Errorf("[UserHandler-4] CreateCustomer %s", "Password Confirmation Not Match")
+		resp.Message = "Password Confirmation Not Match"
+		resp.Data = nil
+		return c.JSON(http.StatusUnprocessableEntity, resp)
+	}
+
+	reqEntity := entity.UserEntity{
+		Name:     req.Name,
+		Email:    req.Email,
+		Password: req.Password,
+		Phone:    strconv.FormatInt(req.Phone, 10),
+		Address:  req.Address,
+		Photo:    req.Photo,
+		Lat:      conv.LatLngToString(req.Lat),
+		Lng:      conv.LatLngToString(req.Lng),
+		RoleID:   req.RoleID,
+	}
+
+	if err := u.userService.CreateCustomer(ctx, reqEntity); err != nil {
+		log.Errorf("[UserHandler-5] CreateCustomer %v", err)
+		if errors.Is(err, apperror.ErrNotFound) {
+			resp.Message = "role not found"
+			resp.Data = nil
+			return c.JSON(http.StatusNotFound, resp)
+		}
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusInternalServerError, resp)
+	}
+
+	resp.Message = "Success"
+	resp.Data = nil
+	return c.JSON(http.StatusCreated, resp)
+}
+
+// UpdateCustomer implements [UserHandlerInterface].
+func (u *userHandler) UpdateCustomer(c echo.Context) error {
+	var (
+		req  = request.UpdateCustomerRequest{}
+		resp = response.DefaultResponse{}
+		ctx  = c.Request().Context()
+	)
+
+	user := c.Get("user").(string)
+	if user == "" {
+		log.Errorf("[UserHandler-1] UpdateCustomer %s", "data token not found")
+		resp.Message = "data token not found"
+		resp.Data = nil
+		return c.JSON(http.StatusUnauthorized, resp)
+	}
+
+	idParam := c.Param("id")
+	if idParam == "" {
+		log.Errorf("[UserHandler-2] UpdateCustomer %s", "id invalid")
+		resp.Message = "id invalid"
+		resp.Data = nil
+		return c.JSON(http.StatusBadRequest, resp)
+	}
+
+	id, err := strconv.ParseInt(idParam, 10, 64)
+	if err != nil {
+		log.Errorf("[UserHandler-3] UpdateCustomer %v", err)
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusBadRequest, resp)
+	}
+
+	if err = c.Bind(&req); err != nil {
+		log.Errorf("[UserHandler-4] UpdateCustomer %v", err)
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusBadRequest, resp)
+	}
+
+	if err = c.Validate(req); err != nil {
+		log.Errorf("[UserHandler-5] UpdateCustomer %v", err)
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusUnprocessableEntity, resp)
+	}
+
+	// Empty password means "keep the current hash", so only a supplied pair is checked.
+	if req.Password != "" && req.Password != req.PasswordConfirmation {
+		log.Errorf("[UserHandler-6] UpdateCustomer %s", "Password Confirmation Not Match")
+		resp.Message = "Password Confirmation Not Match"
+		resp.Data = nil
+		return c.JSON(http.StatusUnprocessableEntity, resp)
+	}
+
+	reqEntity := entity.UserEntity{
+		ID:       id,
+		Name:     req.Name,
+		Email:    req.Email,
+		Password: req.Password,
+		Phone:    strconv.FormatInt(req.Phone, 10),
+		Address:  req.Address,
+		Photo:    req.Photo,
+		Lat:      conv.LatLngToString(req.Lat),
+		Lng:      conv.LatLngToString(req.Lng),
+		RoleID:   req.RoleID,
+	}
+
+	if err = u.userService.UpdateCustomer(ctx, reqEntity); err != nil {
+		log.Errorf("[UserHandler-7] UpdateCustomer %v", err)
+		if errors.Is(err, apperror.ErrNotFound) {
+			resp.Message = "customer not found"
+			resp.Data = nil
+			return c.JSON(http.StatusNotFound, resp)
+		}
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusInternalServerError, resp)
+	}
+
+	resp.Message = "success"
+	resp.Data = nil
+	return c.JSON(http.StatusOK, resp)
+}
+
+// DeleteCustomer implements [UserHandlerInterface].
+func (u *userHandler) DeleteCustomer(c echo.Context) error {
+	var (
+		resp = response.DefaultResponse{}
+		ctx  = c.Request().Context()
+	)
+
+	user := c.Get("user").(string)
+	if user == "" {
+		log.Errorf("[UserHandler-1] DeleteCustomer %s", "data token not found")
+		resp.Message = "data token not found"
+		resp.Data = nil
+		return c.JSON(http.StatusUnauthorized, resp)
+	}
+
+	idParam := c.Param("id")
+	if idParam == "" {
+		log.Errorf("[UserHandler-2] DeleteCustomer %s", "id invalid")
+		resp.Message = "id invalid"
+		resp.Data = nil
+		return c.JSON(http.StatusBadRequest, resp)
+	}
+
+	id, err := strconv.ParseInt(idParam, 10, 64)
+	if err != nil {
+		log.Errorf("[UserHandler-3] DeleteCustomer %v", err)
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusBadRequest, resp)
+	}
+
+	if err = u.userService.DeleteCustomer(ctx, id); err != nil {
+		log.Errorf("[UserHandler-4] DeleteCustomer %v", err)
+		if errors.Is(err, apperror.ErrNotFound) {
+			resp.Message = "customer not found"
+			resp.Data = nil
+			return c.JSON(http.StatusNotFound, resp)
+		}
+		resp.Message = err.Error()
+		resp.Data = nil
+		return c.JSON(http.StatusInternalServerError, resp)
+	}
+
+	resp.Message = "success"
+	resp.Data = nil
+	return c.JSON(http.StatusOK, resp)
 }
 
 // GetCustomerByID implements [UserHandlerInterface].
@@ -586,7 +787,10 @@ func NewUserHandler(e *echo.Echo, userService service.UserServiceInterface, jwtS
 	adminGroup := e.Group("/admin")
 	adminGroup.Use(mid.CheckToken())
 	adminGroup.GET("/customers", userHandler.GetCustomerAll)
+	adminGroup.POST("/customers", userHandler.CreateCustomer)
 	adminGroup.GET("/customers/{id}", userHandler.GetCustomerByID)
+	adminGroup.PUT("/customers/{id}", userHandler.UpdateCustomer)
+	adminGroup.DELETE("/customers/{id}", userHandler.DeleteCustomer)
 	adminGroup.GET("/check", func(c echo.Context) error {
 		return c.String(200, "Admin route accessed successfully")
 	})

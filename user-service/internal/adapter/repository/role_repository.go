@@ -44,8 +44,6 @@ func (r *roleRepository) Delete(ctx context.Context, id int64) error {
 	if err := r.db.Where("id = ?", id).Preload("Users").First(&modelRole).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return apperror.ErrNotFound
-			log.Printf("[RoleRepository-1] Delete:Role not found")
-			return err
 		}
 		log.Printf("[RoleRepository-2] Delete: %v", err)
 		return err

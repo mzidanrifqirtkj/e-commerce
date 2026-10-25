@@ -1,0 +1,54 @@
+# Binaries
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test binary
+*.test
+
+# Output of go coverage tool
+*.out
+coverage.html
+
+# Dependency directories
+vendor/
+
+# Go workspace
+go.work
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Database
+*.db
+*.sqlite
+
+# Migrations (if generated)
+# database/migrations/*.sql
+
+# Docker
+docker-compose.override.yml
+
+# Build artifacts
+bin/
+dist/
+
+# Temporary files
+tmp/
+temp/

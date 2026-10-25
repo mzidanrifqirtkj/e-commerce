@@ -3,14 +3,18 @@ module product-service
 go 1.27.1
 
 require (
+	github.com/go-redis/redis/v8 v8.11.5
 	github.com/pressly/goose/v3 v3.29.0
 	github.com/rs/zerolog v1.35.1
 	github.com/spf13/viper v1.21.0
+	github.com/streadway/amqp v1.1.0
 	gorm.io/driver/postgres v1.6.3
 	gorm.io/gorm v1.31.2
 )
 
 require (
+	github.com/cespare/xxhash/v2 v2.3.0 // indirect
+	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect

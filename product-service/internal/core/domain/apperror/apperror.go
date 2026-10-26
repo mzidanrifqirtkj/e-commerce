@@ -2,15 +2,22 @@
 // match them with errors.Is instead of comparing error strings.
 package apperror
 
-import "errors"
+// Error is a sentinel domain error that also carries the HTTP status the
+// handler should answer with.
+type Error struct {
+	Code    int
+	Message string
+}
+
+func (e *Error) Error() string { return e.Message }
 
 var (
 	// ErrNotFound means the requested row does not exist.
-	ErrNotFound = errors.New("404, not found")
+	ErrNotFound = &Error{Code: 404, Message: "not found"}
 	// ErrUnauthorized means a token is expired, already used, or of the wrong type.
-	ErrUnauthorized = errors.New("401, unauthorized")
+	ErrUnauthorized = &Error{Code: 401, Message: "unauthorized"}
 	// ErrConflict means the requested operation would violate a unique constraint.
-	ErrConflict = errors.New("400, conflict with existing data")
+	ErrConflict = &Error{Code: 409, Message: "conflict with existing data"}
 	// ErrInvalidRequest means the client sent a malformed or out-of-range value.
-	ErrInvalidRequest = errors.New("400, invalid request")
+	ErrInvalidRequest = &Error{Code: 400, Message: "invalid request"}
 )

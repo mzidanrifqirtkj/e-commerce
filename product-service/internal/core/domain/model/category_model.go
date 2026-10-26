@@ -7,11 +7,11 @@ type Category struct {
 	ParentID    *int64
 	Name        string
 	Icon        string
-	Status      string `gorm:"index"`
+	Status      bool   `gorm:"index"`
 	Slug        string `gorm:"index"`
 	Description string
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 	DeletedAt   *time.Time
-	Products    []Product `gorm:"foreignKey:CategorySlug"`
+	Products    []Product `gorm:"foreignKey:CategorySlug;references:Slug"`
 }

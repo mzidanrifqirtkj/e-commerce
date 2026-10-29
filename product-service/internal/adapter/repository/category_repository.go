@@ -15,7 +15,7 @@ import (
 
 type CategoryRepositoryInterface interface {
 	GetAll(ctx context.Context, queryString entity.QueryStringEntity) ([]entity.CategoryEntity, int64, int64, error)
-	GetByID(ctx context.Context, categoryID int64) (*entity.CategoryEntity, error)
+	GetBySlug(ctx context.Context, slug string) (*entity.CategoryEntity, error)
 	Create(ctx context.Context, req entity.CategoryEntity) error
 	Update(ctx context.Context, slug string, req entity.CategoryEntity) error
 	Delete(ctx context.Context, slug string) error
@@ -25,18 +25,21 @@ type categoryRepository struct {
 	db *gorm.DB
 }
 
-// GetByID implements [CategoryRepositoryInterface].
-func (c *categoryRepository) GetByID(ctx context.Context, categoryID int64) (*entity.CategoryEntity, error) {
+// GetBySlug implements [CategoryRepositoryInterface].
+//
+// No Preload here: the only caller is the detail endpoint, which does not report
+// a product count, so loading every product row would be wasted work.
+func (c *categoryRepository) GetBySlug(ctx context.Context, slug string) (*entity.CategoryEntity, error) {
 	modelCategory := model.Category{}
 
-	if err := c.db.WithContext(ctx).Preload("Products").
-		Where("id = ?", categoryID).
+	if err := c.db.WithContext(ctx).
+		Where("slug = ?", slug).
 		First(&modelCategory).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			log.Printf("[CategoryRepository-4] GetByID: category %d not found", categoryID)
+			log.Printf("[CategoryRepository-4] GetBySlug: category %q not found", slug)
 			return nil, apperror.ErrNotFound
 		}
-		log.Printf("[CategoryRepository-5] GetByID: %v", err)
+		log.Printf("[CategoryRepository-5] GetBySlug: %v", err)
 		return nil, err
 	}
 

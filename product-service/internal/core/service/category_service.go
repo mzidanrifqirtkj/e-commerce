@@ -10,7 +10,7 @@ import (
 
 type CategoryServiceInterface interface {
 	GetAll(ctx context.Context, query entity.QueryStringEntity) ([]entity.CategoryEntity, int64, int64, error)
-	GetByID(ctx context.Context, categoryID int64) (*entity.CategoryEntity, error)
+	GetBySlug(ctx context.Context, slug string) (*entity.CategoryEntity, error)
 	Create(ctx context.Context, req entity.CategoryEntity) error
 	Update(ctx context.Context, slug string, req entity.CategoryEntity) error
 	Delete(ctx context.Context, slug string) error
@@ -46,9 +46,9 @@ func (s *categoryService) GetAll(ctx context.Context, query entity.QueryStringEn
 	return s.repo.GetAll(ctx, query)
 }
 
-// GetByID implements [CategoryServiceInterface].
-func (s *categoryService) GetByID(ctx context.Context, categoryID int64) (*entity.CategoryEntity, error) {
-	return s.repo.GetByID(ctx, categoryID)
+// GetBySlug implements [CategoryServiceInterface].
+func (s *categoryService) GetBySlug(ctx context.Context, slug string) (*entity.CategoryEntity, error) {
+	return s.repo.GetBySlug(ctx, slug)
 }
 
 // Update implements [CategoryServiceInterface].

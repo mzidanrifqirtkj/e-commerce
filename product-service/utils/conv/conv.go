@@ -3,6 +3,7 @@ package conv
 
 import (
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -19,4 +20,17 @@ func Slugify(s string) string {
 	s = strings.ToLower(strings.TrimSpace(s))
 	s = slugNonAlnum.ReplaceAllString(s, "-")
 	return slugDashEdge.ReplaceAllString(s, "")
+}
+
+// StringToInt64 parses a base-10 string into an int64.
+//
+// The third argument is bitSize, not a range hint: anything below 64 clips the
+// result (10 would cap it at -512..511), so it must stay 64.
+func StringToInt64(s string) (int64, error) {
+	newData, err := strconv.ParseInt(s, 10, 64)
+	if err != nil {
+		return 0, err
+	}
+
+	return newData, nil
 }

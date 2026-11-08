@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 
+	"product-service/internal/adapter"
 	"product-service/internal/adapter/handler/request"
 	"product-service/internal/adapter/handler/response"
 	"product-service/internal/core/domain/apperror"
@@ -218,18 +219,28 @@ func (h *categoryHandler) Update(c echo.Context) error {
 	return c.JSON(http.StatusOK, response.DefaultResponse{Message: "category updated successfully"})
 }
 
-// NewCategoryHandler registers the category routes on e.
+// NewCategoryHandler registers the category routes on e behind the token
+// middleware.
 //
-// ponytail: no auth middleware yet — product-service has no JWT adapter. Add
-// the group middleware here once one exists.
-func NewCategoryHandler(e *echo.Echo, categoryService service.CategoryServiceInterface) CategoryHandlerInterface {
+// ponytail: CheckToken only bars the Customer role on /admin paths, so these
+// /categories routes require any logged-in user (customer or admin). Add a
+// separate role check here if create/update/delete must become admin-only.
+func NewCategoryHandler(
+	e *echo.Echo,
+	categoryService service.CategoryServiceInterface,
+	jwtService service.JWTServiceInterface,
+) CategoryHandlerInterface {
 	h := &categoryHandler{categoryService: categoryService}
 
-	e.GET("/categories", h.GetAll)
-	e.GET("/categories/:slug", h.GetBySlug)
-	e.POST("/categories", h.Create)
-	e.PUT("/categories/:slug", h.Update)
-	e.DELETE("/categories/:slug", h.Delete)
+	mid := adapter.NewMiddlewareAdapter(jwtService)
+	categoryGroup := e.Group("/categories")
+	categoryGroup.Use(mid.CheckToken())
+
+	categoryGroup.GET("", h.GetAll)
+	categoryGroup.GET("/:slug", h.GetBySlug)
+	categoryGroup.POST("", h.Create)
+	categoryGroup.PUT("/:slug", h.Update)
+	categoryGroup.DELETE("/:slug", h.Delete)
 
 	return h
 }

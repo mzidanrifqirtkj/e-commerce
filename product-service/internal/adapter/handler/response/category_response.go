@@ -7,7 +7,7 @@ type CategoryResponse struct {
 	Name         string `json:"name"`
 	Icon         string `json:"icon"`
 	Slug         string `json:"slug"`
-	Status       bool   `json:"status"`
+	Status       string `json:"status"`
 	TotalProduct int64  `json:"total_product"`
 }
 
@@ -18,6 +18,6 @@ type CategoryDetailResponse struct {
 	Name        string `json:"name"`
 	Icon        string `json:"icon"`
 	Slug        string `json:"slug"`
-	Status      bool   `json:"status"`
+	Status      string `json:"status"`
 	Description string `json:"description"`
 }

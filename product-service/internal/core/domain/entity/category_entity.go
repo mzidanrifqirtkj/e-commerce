@@ -17,4 +17,7 @@ type QueryStringEntity struct {
 	Limit     int
 	OrderBy   string
 	OrderType string
+	// Status filters by the published flag. nil = no filter (all rows);
+	// &true = published only, &false = unpublished only.
+	Status *bool
 }

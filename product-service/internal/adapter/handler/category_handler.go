@@ -48,7 +48,7 @@ func toCategoryResponse(category entity.CategoryEntity) response.CategoryRespons
 		Name:         category.Name,
 		Icon:         category.Icon,
 		Slug:         category.Slug,
-		Status:       category.Status,
+		Status:       conv.BoolToStatus(category.Status),
 		TotalProduct: int64(len(category.Products)),
 	}
 }
@@ -60,7 +60,7 @@ func toCategoryDetailResponse(category entity.CategoryEntity) response.CategoryD
 		Name:        category.Name,
 		Icon:        category.Icon,
 		Slug:        category.Slug,
-		Status:      category.Status,
+		Status:      conv.BoolToStatus(category.Status),
 		Description: category.Description,
 	}
 }
@@ -79,10 +79,10 @@ func (h *categoryHandler) Create(c echo.Context) error {
 		return c.JSON(http.StatusUnprocessableEntity, response.DefaultResponse{Message: err.Error()})
 	}
 
-	// an omitted status keeps the DB default of true
+	// an omitted status keeps the DB default of published
 	status := true
 	if req.Status != nil {
-		status = *req.Status
+		status, _ = conv.StatusToBool(*req.Status)
 	}
 
 	reqEntity := entity.CategoryEntity{
@@ -134,6 +134,14 @@ func (h *categoryHandler) GetAll(c echo.Context) error {
 		Limit:     limit,
 		OrderBy:   c.QueryParam("order_by"),
 		OrderType: c.QueryParam("order_type"),
+	}
+
+	// status is optional; anything unparseable is ignored so the list keeps
+	// showing all rows instead of silently returning nothing.
+	if s := c.QueryParam("status"); s != "" {
+		if parsed, ok := conv.StatusToBool(s); ok {
+			query.Status = &parsed
+		}
 	}
 
 	categories, countData, totalPage, err := h.categoryService.GetAll(c.Request().Context(), query)
@@ -203,12 +211,18 @@ func (h *categoryHandler) Update(c echo.Context) error {
 		return c.JSON(http.StatusUnprocessableEntity, response.DefaultResponse{Message: "status is required"})
 	}
 
+	status, ok := conv.StatusToBool(*req.Status)
+	if !ok {
+		log.Printf("[CategoryHandler-12] Update: invalid status %q", *req.Status)
+		return c.JSON(http.StatusUnprocessableEntity, response.DefaultResponse{Message: "status must be published or unpublished"})
+	}
+
 	reqEntity := entity.CategoryEntity{
 		ParentID:    req.ParentID,
 		Name:        req.Name,
 		Icon:        req.Icon,
 		Slug:        req.Slug,
-		Status:      *req.Status,
+		Status:      status,
 		Description: req.Description,
 	}
 

@@ -34,3 +34,24 @@ func StringToInt64(s string) (int64, error) {
 
 	return newData, nil
 }
+
+// StatusToBool maps the API status word to the DB boolean. ok is false for any
+// word other than "published" or "unpublished".
+func StatusToBool(s string) (v bool, ok bool) {
+	switch s {
+	case "published":
+		return true, true
+	case "unpublished":
+		return false, true
+	default:
+		return false, false
+	}
+}
+
+// BoolToStatus is the inverse of StatusToBool.
+func BoolToStatus(v bool) string {
+	if v {
+		return "published"
+	}
+	return "unpublished"
+}

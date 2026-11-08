@@ -165,9 +165,16 @@ func (c *categoryRepository) GetAll(ctx context.Context, query entity.QueryStrin
 	offset := (page - 1) * limit
 
 	search := "%" + query.Search + "%"
+	baseWhere := "name ILIKE ? OR status::text ILIKE ? OR slug ILIKE ?"
+	baseArgs := []any{search, search, search}
+	if query.Status != nil {
+		baseWhere += " AND status = ?"
+		baseArgs = append(baseArgs, *query.Status)
+	}
+
 	// separate chains: GORM statement cannot be reused after Count
 	countMain := c.db.WithContext(ctx).Model(&model.Category{}).
-		Where("name ILIKE ? OR status::text ILIKE ? OR slug ILIKE ?", search, search, search)
+		Where(baseWhere, baseArgs...)
 
 	if err := countMain.Count(&countData).Error; err != nil {
 		log.Printf("[CategoryRepository-1] GetCategoryAll: %v", err)
@@ -175,7 +182,7 @@ func (c *categoryRepository) GetAll(ctx context.Context, query entity.QueryStrin
 	}
 
 	if err := c.db.WithContext(ctx).Preload("Products").
-		Where("name ILIKE ? OR status::text ILIKE ? OR slug ILIKE ?", search, search, search).
+		Where(baseWhere, baseArgs...).
 		Order(order).Limit(limit).Offset(offset).
 		Find(&modelCategories).Error; err != nil {
 		log.Printf("[CategoryRepository-2] GetCategoryAll: %v", err)

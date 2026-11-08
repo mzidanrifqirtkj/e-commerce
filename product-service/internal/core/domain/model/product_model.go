@@ -15,7 +15,8 @@ type Product struct {
 	Weight       int
 	Stock        int
 	Variant      int
-	Status       string `gorm:"index"`
+	Status       string   `gorm:"index"`
+	Category     Category `gorm:"foreignKey:CategorySlug;references:CategorySlug"`
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 	DeletedAt    *time.Time

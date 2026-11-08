@@ -16,3 +16,14 @@ type ProductEntity struct {
 	Status       string
 	CategoryName string
 }
+
+type QueryStringProduct struct {
+	Search       string
+	Page         int
+	Limit        int
+	OrderBy      string
+	OrderType    string
+	CategorySlug string
+	StartPrice   int64
+	EndPrice     int64
+}

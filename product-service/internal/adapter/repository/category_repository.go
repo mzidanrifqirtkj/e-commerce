@@ -182,9 +182,10 @@ func (c *categoryRepository) GetAll(ctx context.Context, query entity.QueryStrin
 		return nil, 0, 0, err
 	}
 
+	// Empty result is a valid response, not an error: the handler answers 200
+	// with an empty list and a 0 total page count.
 	if len(modelCategories) < 1 {
-		log.Printf("[CategoryRepository-3] GetCategoryAll: no category found")
-		return nil, 0, 0, apperror.ErrNotFound
+		return []entity.CategoryEntity{}, countData, 0, nil
 	}
 
 	totalPage := int(math.Ceil(float64(countData) / float64(limit)))

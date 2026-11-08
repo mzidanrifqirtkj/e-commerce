@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"product-service/database/seeds"
 
 	"github.com/pressly/goose/v3"
 	"github.com/rs/zerolog/log"
@@ -40,6 +41,8 @@ func (cfg Config) ConnectionPostgres() (*Postgres, error) {
 		log.Error().Err(err).Msg("[ConnectionPostgres-3] Failed to run migrations")
 		return nil, err
 	}
+
+	seeds.SeedCategory(db)
 
 	return &Postgres{DB: db}, nil
 }

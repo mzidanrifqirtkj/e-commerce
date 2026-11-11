@@ -17,10 +17,114 @@ import (
 type ProductRepositoryInterface interface {
 	GetAll(ctx context.Context, req entity.QueryStringProduct) ([]entity.ProductEntity, int64, int64, error)
 	GetByID(ctx context.Context, id uint) (*entity.ProductEntity, error)
+	Create(ctx context.Context, req entity.ProductEntity) error
+	Update(ctx context.Context, id uint, req entity.ProductEntity) error
+	Delete(ctx context.Context, id uint) error
 }
 
 type productcategoryRepository struct {
 	db *gorm.DB
+}
+
+// Create implements [ProductRepositoryInterface].
+func (p *productcategoryRepository) Create(ctx context.Context, req entity.ProductEntity) error {
+	modelProduct := toProductModel(req)
+
+	// GORM auto-saves the Children association: it inserts the parent first,
+	// then fills each child's parent_id with the parent's new ID and inserts it.
+	if err := p.db.WithContext(ctx).Create(&modelProduct).Error; err != nil {
+		log.Printf("[ProductRepository-7] Create: %v", err)
+		return err
+	}
+
+	return nil
+}
+
+// Update implements [ProductRepositoryInterface].
+func (p *productcategoryRepository) Update(ctx context.Context, id uint, req entity.ProductEntity) error {
+	modelProduct := model.Product{}
+
+	if err := p.db.WithContext(ctx).Where("id = ?", id).First(&modelProduct).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			log.Printf("[ProductRepository-8] Update: product %d not found", id)
+			return apperror.ErrNotFound
+		}
+		log.Printf("[ProductRepository-9] Update: %v", err)
+		return err
+	}
+
+	// map so zero values (empty image, 0 stock) still get written
+	updates := map[string]any{
+		"category_slug": req.CategorySlug,
+		"parent_id":     req.ParentID,
+		"name":          req.Name,
+		"image":         req.Image,
+		"description":   req.Description,
+		"regular_price": req.RegularPrice,
+		"sale_price":    req.SalePrice,
+		"unit":          req.Unit,
+		"weight":        req.Weight,
+		"stock":         req.Stock,
+		"variant":       req.Variant,
+		"status":        req.Status,
+	}
+
+	children := make([]model.Product, len(req.Child))
+	for i, c := range req.Child {
+		children[i] = toProductModel(c)
+		children[i].ID = c.ID // existing child must keep its ID, else GORM inserts a duplicate
+	}
+
+	return p.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&modelProduct).Updates(updates).Error; err != nil {
+			log.Printf("[ProductRepository-10] Update: %v", err)
+			return err
+		}
+
+		// nil = not sent, leave children untouched; empty slice = replace with none.
+		if req.Child != nil {
+			if err := tx.Model(&modelProduct).Association("Children").Replace(children); err != nil {
+				log.Printf("[ProductRepository-16] Update: %v", err)
+				return err
+			}
+		}
+
+		return nil
+	})
+}
+
+// Delete implements [ProductRepositoryInterface].
+func (p *productcategoryRepository) Delete(ctx context.Context, id uint) error {
+	modelProduct := model.Product{}
+
+	if err := p.db.WithContext(ctx).Where("id = ?", id).First(&modelProduct).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			log.Printf("[ProductRepository-11] Delete: product %d not found", id)
+			return apperror.ErrNotFound
+		}
+		log.Printf("[ProductRepository-12] Delete: %v", err)
+		return err
+	}
+
+	// ponytail: refuse instead of orphaning the children. If a product delete
+	// should cascade to its variants, drop this guard and add ON DELETE CASCADE.
+	var childCount int64
+	if err := p.db.WithContext(ctx).Model(&model.Product{}).
+		Where("parent_id = ?", id).Count(&childCount).Error; err != nil {
+		log.Printf("[ProductRepository-13] Delete: %v", err)
+		return err
+	}
+	if childCount > 0 {
+		log.Printf("[ProductRepository-14] Delete: product %d still has %d children", id, childCount)
+		return apperror.ErrConflict
+	}
+
+	if err := p.db.WithContext(ctx).Delete(&modelProduct).Error; err != nil {
+		log.Printf("[ProductRepository-15] Delete: %v", err)
+		return err
+	}
+
+	return nil
 }
 
 // GetByID implements [ProductRepositoryInterface].
@@ -153,6 +257,29 @@ func toProductEntity(m model.Product) entity.ProductEntity {
 		Status:       m.Status,
 		CategoryName: m.Category.Name,
 		Child:        child,
+	}
+}
+
+func toProductModel(e entity.ProductEntity) model.Product {
+	children := make([]model.Product, len(e.Child))
+	for i, c := range e.Child {
+		children[i] = toProductModel(c)
+	}
+
+	return model.Product{
+		CategorySlug: e.CategorySlug,
+		ParentID:     e.ParentID,
+		Name:         e.Name,
+		Image:        e.Image,
+		Description:  e.Description,
+		RegularPrice: e.RegularPrice,
+		SalePrice:    e.SalePrice,
+		Unit:         e.Unit,
+		Weight:       e.Weight,
+		Stock:        e.Stock,
+		Variant:      e.Variant,
+		Status:       e.Status,
+		Children:     children,
 	}
 }
 

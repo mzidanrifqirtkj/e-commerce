@@ -15,6 +15,7 @@ type ProductEntity struct {
 	Variant      int
 	Status       string
 	CategoryName string
+	Child        []ProductEntity
 }
 
 type QueryStringProduct struct {

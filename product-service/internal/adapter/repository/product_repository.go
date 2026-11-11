@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"math"
@@ -15,10 +16,30 @@ import (
 
 type ProductRepositoryInterface interface {
 	GetAll(ctx context.Context, req entity.QueryStringProduct) ([]entity.ProductEntity, int64, int64, error)
+	GetByID(ctx context.Context, id uint) (*entity.ProductEntity, error)
 }
 
 type productcategoryRepository struct {
 	db *gorm.DB
+}
+
+// GetByID implements [ProductRepositoryInterface].
+func (p *productcategoryRepository) GetByID(ctx context.Context, id uint) (*entity.ProductEntity, error) {
+	var modelProduct model.Product
+	if err := p.db.WithContext(ctx).
+		Preload("Category").
+		Preload("Children.Category").
+		First(&modelProduct, "id = ?", id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			log.Printf("[ProductRepository-5] GetByID: product %d not found", id)
+			return nil, apperror.ErrNotFound
+		}
+		log.Printf("[ProductRepository-6] GetByID: %v", err)
+		return nil, err
+	}
+
+	product := toProductEntity(modelProduct)
+	return &product, nil
 }
 
 var productOrderColumns = map[string]bool{
@@ -84,50 +105,55 @@ func (p *productcategoryRepository) GetAll(ctx context.Context, req entity.Query
 		return nil, 0, 0, err
 	}
 
-	type productWithCategory struct {
-		model.Product
-		CategoryName string
-	}
-
-	rows := []productWithCategory{}
-	if err := p.db.WithContext(ctx).Model(&model.Product{}).
-		Select("products.*, categories.name AS category_name").
-		Joins("LEFT JOIN categories ON categories.slug = products.category_slug").
+	modelProducts := []model.Product{}
+	if err := p.db.WithContext(ctx).
+		Preload("Category").
+		Preload("Children.Category").
 		Where(baseWhere, baseArgs...).
 		Order(order).Limit(limit).Offset(offset).
-		Scan(&rows).Error; err != nil {
+		Find(&modelProducts).Error; err != nil {
 		log.Printf("[ProductRepository-4] GetAll: %v", err)
 		return nil, 0, 0, err
 	}
 
 	// Empty result is a valid response, not an error.
-	if len(rows) < 1 {
+	if len(modelProducts) < 1 {
 		return []entity.ProductEntity{}, countData, 0, nil
 	}
 
 	totalPage := int(math.Ceil(float64(countData) / float64(limit)))
 
-	products := make([]entity.ProductEntity, len(rows))
-	for i, row := range rows {
-		products[i] = entity.ProductEntity{
-			ID:           row.ID,
-			CategorySlug: row.CategorySlug,
-			ParentID:     row.ParentID,
-			Name:         row.Name,
-			Image:        row.Image,
-			Description:  row.Description,
-			RegularPrice: row.RegularPrice,
-			SalePrice:    row.SalePrice,
-			Unit:         row.Unit,
-			Weight:       row.Weight,
-			Stock:        row.Stock,
-			Variant:      row.Variant,
-			Status:       row.Status,
-			CategoryName: row.CategoryName,
-		}
+	products := make([]entity.ProductEntity, len(modelProducts))
+	for i, modelProduct := range modelProducts {
+		products[i] = toProductEntity(modelProduct)
 	}
 
 	return products, countData, int64(totalPage), nil
+}
+
+func toProductEntity(m model.Product) entity.ProductEntity {
+	child := make([]entity.ProductEntity, len(m.Children))
+	for i, c := range m.Children {
+		child[i] = toProductEntity(c)
+	}
+
+	return entity.ProductEntity{
+		ID:           m.ID,
+		CategorySlug: m.CategorySlug,
+		ParentID:     m.ParentID,
+		Name:         m.Name,
+		Image:        m.Image,
+		Description:  m.Description,
+		RegularPrice: m.RegularPrice,
+		SalePrice:    m.SalePrice,
+		Unit:         m.Unit,
+		Weight:       m.Weight,
+		Stock:        m.Stock,
+		Variant:      m.Variant,
+		Status:       m.Status,
+		CategoryName: m.Category.Name,
+		Child:        child,
+	}
 }
 
 func NewProductRepository(db *gorm.DB) ProductRepositoryInterface {
